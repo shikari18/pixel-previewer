@@ -127,7 +127,7 @@ function LibraryPage() {
       <div className="relative w-full max-w-md h-full flex flex-col">
         
         {/* Header */}
-        <header className="flex items-center justify-between px-6 pt-14 pb-4 flex-shrink-0">
+        <header className="flex items-center justify-between px-6 pt-6 pb-4 flex-shrink-0">
           <button
             aria-label="Back"
             onClick={() => navigate({ to: "/home" })}

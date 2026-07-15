@@ -238,7 +238,7 @@ STRICT RULES:
       <div className="relative w-full max-w-md h-full flex flex-col">
         
         {/* Header with back arrow */}
-        <header className="flex items-center justify-between px-6 pt-12 pb-4 flex-shrink-0">
+        <header className="flex items-center justify-between px-6 pt-6 pb-4 flex-shrink-0">
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate({ to: "/home" })}

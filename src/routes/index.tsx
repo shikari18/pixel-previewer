@@ -24,7 +24,7 @@ function Index() {
   ];
   return (
     <div className="min-h-screen bg-black text-white flex justify-center page-transition">
-      <div className="relative w-full max-w-md min-h-screen flex flex-col px-8 pt-12 pb-10">
+      <div className="relative w-full max-w-md min-h-screen flex flex-col px-8 pt-6 pb-10">
         <header className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <svg width="28" height="20" viewBox="0 0 28 20" fill="none" className="text-white">
@@ -56,14 +56,14 @@ function Index() {
             Focus deeply. Learn smarter.<br />Achieve more.
           </p>
 
-          <div className="mt-16 space-y-4">
+          <div className="mt-10 space-y-3">
             <Link
               to="/signup"
-              className="block w-full rounded-2xl bg-white text-black font-medium py-5 text-base text-center shadow-[0_0_40px_rgba(255,255,255,0.25)]"
+              className="block w-full rounded-2xl bg-white text-black font-medium py-4 text-sm text-center shadow-[0_0_40px_rgba(255,255,255,0.25)]"
             >
               Get Started
             </Link>
-            <button className="w-full rounded-2xl border border-white/15 bg-white/[0.03] text-white font-medium py-5 text-base flex items-center justify-center gap-2">
+            <button className="w-full rounded-2xl border border-white/15 bg-white/[0.03] text-white font-medium py-4 text-sm flex items-center justify-center gap-2">
               Explore Features
               <ChevronRight className="h-4 w-4" strokeWidth={2} />
             </button>

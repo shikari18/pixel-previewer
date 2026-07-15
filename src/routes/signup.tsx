@@ -1,7 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { useState, type FormEvent } from "react";
-
 export const Route = createFileRoute("/signup")({
   head: () => ({
     meta: [
@@ -17,7 +16,6 @@ export const Route = createFileRoute("/signup")({
 function SignUp() {
   const navigate = useNavigate();
   const [showPw, setShowPw] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -37,12 +35,12 @@ function SignUp() {
           </button>
         </header>
 
-        <div className="mt-10">
+        <div className="mt-14">
           <h1 className="text-5xl font-bold tracking-tight">Create Account</h1>
           <p className="mt-3 text-lg text-white/50">Let's get you started</p>
         </div>
 
-        <div className="mt-8 space-y-3">
+        <div className="mt-10 space-y-3">
           <button className="w-full rounded-2xl border border-white/10 bg-white/[0.03] py-4 flex items-center justify-center gap-3 text-base font-medium relative">
             <svg viewBox="0 0 24 24" className="h-5 w-5 absolute left-6" fill="currentColor" aria-hidden>
               <path d="M16.365 1.43c0 1.14-.42 2.2-1.26 3.03-.84.84-1.86 1.3-2.94 1.22-.13-1.08.42-2.22 1.2-3.02.84-.86 2.02-1.34 3-1.23zM20.5 17.06c-.55 1.27-.81 1.83-1.51 2.95-.98 1.56-2.36 3.51-4.07 3.53-1.52.02-1.91-.99-3.97-.97-2.06.01-2.49.99-4.01.97-1.71-.02-3.02-1.78-4-3.34C.06 15.83-.42 10.62 1.4 7.85c1.29-1.96 3.32-3.11 5.24-3.11 1.95 0 3.18 1.07 4.79 1.07 1.56 0 2.51-1.07 4.77-1.07 1.71 0 3.52.93 4.81 2.54-4.23 2.32-3.54 8.36-.51 9.78z" />
@@ -60,27 +58,24 @@ function SignUp() {
           </button>
         </div>
 
-        <div className="mt-6 flex items-center gap-4">
+        <div className="mt-8 flex items-center gap-4">
           <div className="h-px flex-1 bg-white/10" />
           <span className="text-sm text-white/50">or</span>
           <div className="h-px flex-1 bg-white/10" />
         </div>
 
-        <form className="mt-6 space-y-3" onSubmit={handleSubmit}>
-          <input
-            type="text"
-            placeholder="Full Name"
-            className="w-full rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-4 text-base placeholder:text-white/40 focus:outline-none focus:border-white/25"
-          />
+        <form className="mt-8 space-y-3" onSubmit={handleSubmit}>
           <input
             type="email"
             placeholder="Email Address"
+            required
             className="w-full rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-4 text-base placeholder:text-white/40 focus:outline-none focus:border-white/25"
           />
           <div className="relative">
             <input
               type={showPw ? "text" : "password"}
               placeholder="Password"
+              required
               className="w-full rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-4 pr-14 text-base placeholder:text-white/40 focus:outline-none focus:border-white/25"
             />
             <button
@@ -90,21 +85,6 @@ function SignUp() {
               className="absolute right-5 top-1/2 -translate-y-1/2 text-white/50 hover:text-white/80"
             >
               {showPw ? <EyeOff className="h-5 w-5" strokeWidth={1.5} /> : <Eye className="h-5 w-5" strokeWidth={1.5} />}
-            </button>
-          </div>
-          <div className="relative">
-            <input
-              type={showConfirm ? "text" : "password"}
-              placeholder="Confirm Password"
-              className="w-full rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-4 pr-14 text-base placeholder:text-white/40 focus:outline-none focus:border-white/25"
-            />
-            <button
-              type="button"
-              aria-label="Toggle confirm password"
-              onClick={() => setShowConfirm((v) => !v)}
-              className="absolute right-5 top-1/2 -translate-y-1/2 text-white/50 hover:text-white/80"
-            >
-              {showConfirm ? <EyeOff className="h-5 w-5" strokeWidth={1.5} /> : <Eye className="h-5 w-5" strokeWidth={1.5} />}
             </button>
           </div>
 
