@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Eye, EyeOff } from "lucide-react";
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
+
 
 export const Route = createFileRoute("/signup")({
   head: () => ({
@@ -19,9 +20,14 @@ function SignUp() {
   const [showPw, setShowPw] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    navigate({ to: "/welcome" });
+  };
+
   return (
-    <div className="min-h-screen bg-black text-white flex justify-center">
-      <div className="relative w-full max-w-md min-h-screen flex flex-col px-8 pt-12 pb-10">
+    <div className="fixed inset-0 bg-black text-white flex justify-center overflow-hidden">
+      <div className="relative w-full max-w-md h-full flex flex-col px-8 pt-12 pb-6 overflow-hidden">
         <header className="flex items-center justify-between">
           <button
             aria-label="Back"
@@ -30,10 +36,8 @@ function SignUp() {
           >
             <ArrowLeft className="h-6 w-6" strokeWidth={1.5} />
           </button>
-          <Link to="/" className="text-base text-white/90">
-            Skip
-          </Link>
         </header>
+
 
         <div className="mt-14">
           <h1 className="text-5xl font-bold tracking-tight">Create Account</h1>
