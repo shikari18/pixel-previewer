@@ -2,25 +2,25 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
-export const Route = createFileRoute("/signup")({
+export const Route = createFileRoute("/signin")({
   head: () => ({
     meta: [
-      { title: "Create Account — The Flow" },
-      { name: "description", content: "Create your The Flow account to focus deeply and learn smarter." },
-      { property: "og:title", content: "Create Account — The Flow" },
-      { property: "og:description", content: "Create your The Flow account to focus deeply and learn smarter." },
+      { title: "Sign In — The Flow" },
+      { name: "description", content: "Sign in to your The Flow account to continue learning." },
+      { property: "og:title", content: "Sign In — The Flow" },
+      { property: "og:description", content: "Sign in to your The Flow account to continue learning." },
     ],
   }),
-  component: SignUp,
+  component: SignIn,
 });
 
-function SignUp() {
+function SignIn() {
   const navigate = useNavigate();
   const [showPw, setShowPw] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
+    // Navigate to onboarding or dashboard after successful sign-in
     navigate({ to: "/onboarding/$step", params: { step: "1" } });
   };
 
@@ -38,8 +38,8 @@ function SignUp() {
         </header>
 
         <div className="mt-14">
-          <h1 className="text-5xl font-bold tracking-tight">Create Account</h1>
-          <p className="mt-3 text-lg text-white/50">Let's get you started</p>
+          <h1 className="text-5xl font-bold tracking-tight">Sign In</h1>
+          <p className="mt-3 text-lg text-white/50">Welcome back!</p>
         </div>
 
         <div className="mt-10 space-y-3">
@@ -68,19 +68,16 @@ function SignUp() {
 
         <form className="mt-8 space-y-3" onSubmit={handleSubmit}>
           <input
-            type="text"
-            placeholder="Full Name"
-            className="w-full rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-4 text-base placeholder:text-white/40 focus:outline-none focus:border-white/25"
-          />
-          <input
             type="email"
             placeholder="Email Address"
+            required
             className="w-full rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-4 text-base placeholder:text-white/40 focus:outline-none focus:border-white/25"
           />
           <div className="relative">
             <input
               type={showPw ? "text" : "password"}
               placeholder="Password"
+              required
               className="w-full rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-4 pr-14 text-base placeholder:text-white/40 focus:outline-none focus:border-white/25"
             />
             <button
@@ -92,34 +89,25 @@ function SignUp() {
               {showPw ? <EyeOff className="h-5 w-5" strokeWidth={1.5} /> : <Eye className="h-5 w-5" strokeWidth={1.5} />}
             </button>
           </div>
-          <div className="relative">
-            <input
-              type={showConfirm ? "text" : "password"}
-              placeholder="Confirm Password"
-              className="w-full rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-4 pr-14 text-base placeholder:text-white/40 focus:outline-none focus:border-white/25"
-            />
-            <button
-              type="button"
-              aria-label="Toggle confirm password"
-              onClick={() => setShowConfirm((v) => !v)}
-              className="absolute right-5 top-1/2 -translate-y-1/2 text-white/50 hover:text-white/80"
-            >
-              {showConfirm ? <EyeOff className="h-5 w-5" strokeWidth={1.5} /> : <Eye className="h-5 w-5" strokeWidth={1.5} />}
-            </button>
+
+          <div className="flex justify-end pt-1">
+            <a href="#" className="text-sm text-white/50 hover:text-white transition-colors">
+              Forgot Password?
+            </a>
           </div>
 
           <button
             type="submit"
-            className="mt-4 w-full rounded-2xl bg-white text-black font-medium py-4 text-base shadow-[0_0_40px_rgba(255,255,255,0.2)]"
+            className="mt-2 w-full rounded-2xl bg-white text-black font-medium py-4 text-base shadow-[0_0_40px_rgba(255,255,255,0.2)]"
           >
-            Sign Up
+            Sign In
           </button>
         </form>
 
-        <p className="mt-4 text-center text-sm text-white/50">
-          Already have an account?{" "}
-          <Link to="/signin" className="text-white font-semibold">
-            Sign In
+        <p className="mt-6 text-center text-sm text-white/50">
+          Don't have an account?{" "}
+          <Link to="/signup" className="text-white font-semibold">
+            Sign Up
           </Link>
         </p>
       </div>

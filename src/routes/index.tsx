@@ -6,9 +6,9 @@ import waveImg from "@/assets/flow-wave.jpg";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Flow State — Focus deeply. Learn smarter." },
-      { name: "description", content: "Enter Flow State. Focus deeply. Learn smarter. Achieve more." },
-      { property: "og:title", content: "Flow State" },
+      { title: "The Flow — Focus deeply. Learn smarter." },
+      { name: "description", content: "Enter The Flow. Focus deeply. Learn smarter. Achieve more." },
+      { property: "og:title", content: "The Flow" },
       { property: "og:description", content: "Focus deeply. Learn smarter. Achieve more." },
     ],
   }),
@@ -17,9 +17,13 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const menuItems = ["Customer Service", "About Us", "Contact Us", "Pricing", "Learn More"];
+  const menuItems = [
+    { label: "Customer Service", to: "/customer-service" },
+    { label: "About Us", to: "/about-us" },
+    { label: "Pricing", to: "/pricing" }
+  ];
   return (
-    <div className="min-h-screen bg-black text-white flex justify-center">
+    <div className="min-h-screen bg-black text-white flex justify-center page-transition">
       <div className="relative w-full max-w-md min-h-screen flex flex-col px-8 pt-12 pb-10">
         <header className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -27,7 +31,7 @@ function Index() {
               <path d="M1 7 Q7 -1 14 7 T27 7" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
               <path d="M1 13 Q7 5 14 13 T27 13" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
             </svg>
-            <span className="text-lg font-medium tracking-tight">Flow State</span>
+            <span className="text-lg font-medium tracking-tight">The Flow</span>
           </div>
           <button aria-label="Menu" onClick={() => setMenuOpen(true)} className="text-white/90">
             <Menu className="h-6 w-6" strokeWidth={1.5} />
@@ -46,7 +50,7 @@ function Index() {
 
         <div className="relative mt-auto">
           <h1 className="text-6xl font-bold leading-[1.05] tracking-tight">
-            Enter<br />Flow State
+            Enter<br />The Flow
           </h1>
           <p className="mt-6 text-lg text-white/60 leading-snug">
             Focus deeply. Learn smarter.<br />Achieve more.
@@ -85,7 +89,7 @@ function Index() {
                 <path d="M1 7 Q7 -1 14 7 T27 7" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
                 <path d="M1 13 Q7 5 14 13 T27 13" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
               </svg>
-              <span className="text-lg font-medium tracking-tight">Flow State</span>
+              <span className="text-lg font-medium tracking-tight">The Flow</span>
             </div>
             <button
               aria-label="Close menu"
@@ -100,9 +104,9 @@ function Index() {
 
           <nav className="mt-6 flex flex-col">
             {menuItems.map((item, i) => (
-              <a
-                key={item}
-                href="#"
+              <Link
+                key={item.label}
+                to={item.to}
                 onClick={() => setMenuOpen(false)}
                 style={{
                   transitionDelay: menuOpen ? `${120 + i * 60}ms` : "0ms",
@@ -111,17 +115,17 @@ function Index() {
                   menuOpen ? "translate-x-0 opacity-100" : "translate-x-4 opacity-0"
                 }`}
               >
-                <span>{item}</span>
+                <span>{item.label}</span>
                 <ChevronRight
                   className="h-5 w-5 text-white/30 transition-transform group-hover:translate-x-1 group-hover:text-white/70"
                   strokeWidth={2}
                 />
-              </a>
+              </Link>
             ))}
           </nav>
 
           <div className="mt-auto pt-10 text-xs text-white/40">
-            © {new Date().getFullYear()} Flow State
+            © {new Date().getFullYear()} The Flow
           </div>
         </div>
       </div>

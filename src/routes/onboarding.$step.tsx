@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate, notFound } from "@tanstack/react-router";
 import orbImg from "@/assets/onboard-orb.jpg";
 import focusImg from "@/assets/onboard-focus.jpg";
 import aiImg from "@/assets/onboard-ai.jpg";
-import cubesImg from "@/assets/onboard-cubes.jpg";
+import puzzleImg from "@/assets/the-puzzle.png";
 
 type Slide = {
   image: string;
@@ -14,8 +14,8 @@ type Slide = {
 const slides: Slide[] = [
   {
     image: orbImg,
-    alt: "Glowing Flow State orb",
-    title: "Welcome to\nFlow State",
+    alt: "Glowing The Flow orb",
+    title: "Welcome to\nThe Flow",
     description: "Your all-in-one space to study, collaborate, and grow.",
   },
   {
@@ -30,27 +30,25 @@ const slides: Slide[] = [
     title: "AI That Learns\nWith You",
     description: "Get instant help on assignments, notes, and tough questions.",
   },
-  {
-    image: cubesImg,
-    alt: "Cluster of feature cubes",
-    title: "Everything You\nNeed to Succeed",
-    description: "Assignments, AI help, study with friends, and powerful tools.",
-  },
 ];
 
 export const Route = createFileRoute("/onboarding/$step")({
   parseParams: ({ step }) => {
     const n = Number(step);
-    if (!Number.isInteger(n) || n < 1 || n > slides.length) throw notFound();
+    if (!Number.isInteger(n) || n < 1 || n > 4) throw notFound();
     return { step: String(n) };
   },
   head: ({ params }) => {
-    const slide = slides[Number(params.step) - 1] ?? slides[0];
-    const title = slide.title.replace(/\n/g, " ");
+    const titles = [
+      "Welcome to The Flow",
+      "Focus Deeply, Every Session",
+      "AI That Learns With You",
+      "Everything You Need to Succeed",
+    ];
+    const title = titles[Number(params.step) - 1] ?? titles[0];
     return {
       meta: [
-        { title: `${title} — Flow State` },
-        { name: "description", content: slide.description },
+        { title: `${title} — The Flow` },
       ],
     };
   },
@@ -66,12 +64,11 @@ function Onboarding() {
   const { step } = Route.useParams();
   const navigate = useNavigate();
   const index = Number(step) - 1;
-  const slide = slides[index];
-  const isLast = index === slides.length - 1;
+  const isLast = index === 3;
 
   const goNext = () => {
     if (isLast) {
-      navigate({ to: "/" });
+      navigate({ to: "/home" });
     } else {
       navigate({
         to: "/onboarding/$step",
@@ -80,29 +77,81 @@ function Onboarding() {
     }
   };
 
+  // Dot indicators — shared across all slides
+  const dots = (
+    <div className="flex items-center justify-center gap-2">
+      {[0, 1, 2, 3].map((i) => (
+        <span
+          key={i}
+          className={`h-1 rounded-full transition-all ${
+            i === index ? "w-10 bg-white" : "w-10 bg-white/20"
+          }`}
+        />
+      ))}
+    </div>
+  );
+
+  // ─── SLIDE 4 — completely rewritten layout ───────────────────────────────
+  if (isLast) {
+    return (
+      <div className="fixed inset-0 bg-black text-white flex justify-center overflow-hidden page-transition">
+        <div className="relative w-full max-w-md h-full flex flex-col">
+
+          {/* Full-bleed image — top half */}
+          <div className="relative w-full flex-1 overflow-hidden">
+            <img
+              src={puzzleImg}
+              alt="The puzzle — everything fits together"
+              className="w-full h-full object-cover object-center"
+            />
+            {/* Gradient fade at bottom so text reads clean */}
+            <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black to-transparent" />
+          </div>
+
+          {/* Bottom content panel */}
+          <div className="flex flex-col px-8 pb-10 pt-6 bg-black">
+            {/* Dots */}
+            {dots}
+
+            {/* Text */}
+            <h1 className="mt-6 text-4xl font-bold tracking-tight leading-[1.1] whitespace-pre-line">
+              {"Everything You\nNeed to Succeed"}
+            </h1>
+            <p className="mt-4 text-base text-white/50 leading-relaxed">
+              Assignments, AI help, study with friends, and powerful tools.
+            </p>
+
+            {/* Start button */}
+            <button
+              onClick={goNext}
+              className="mt-8 w-full rounded-2xl bg-white text-black font-semibold py-5 text-base shadow-[0_0_40px_rgba(255,255,255,0.2)]"
+            >
+              Start
+            </button>
+          </div>
+
+        </div>
+      </div>
+    );
+  }
+
+  // ─── SLIDES 1–3 — original shared layout ────────────────────────────────
+  const slide = slides[index];
+
   return (
-    <div className="fixed inset-0 bg-black text-white flex justify-center overflow-hidden">
+    <div className="fixed inset-0 bg-black text-white flex justify-center overflow-hidden page-transition">
       <div className="relative w-full max-w-md h-full flex flex-col px-8 pt-12 pb-10">
         <header className="flex items-center justify-end h-6">
-          {!isLast && (
-            <button
-              onClick={() => navigate({ to: "/" })}
-              className="text-base text-white/90"
-            >
-              Skip
-            </button>
-          )}
+          <button
+            onClick={() => navigate({ to: "/" })}
+            className="text-base text-white/90"
+          >
+            Skip
+          </button>
         </header>
 
-        <div className="mt-8 flex items-center justify-center gap-2">
-          {slides.map((_, i) => (
-            <span
-              key={i}
-              className={`h-1 rounded-full transition-all ${
-                i === index ? "w-10 bg-white" : "w-10 bg-white/20"
-              }`}
-            />
-          ))}
+        <div className="mt-8">
+          {dots}
         </div>
 
         <div className="flex-1 flex flex-col items-center justify-center">
@@ -126,7 +175,7 @@ function Onboarding() {
           onClick={goNext}
           className="w-full rounded-2xl bg-white/[0.04] border border-white/10 py-5 text-base font-medium text-white"
         >
-          {isLast ? "Start" : "Next"}
+          Next
         </button>
       </div>
     </div>

@@ -10,12 +10,66 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as SigninRouteImport } from './routes/signin'
+import { Route as PricingRouteImport } from './routes/pricing'
+import { Route as LibraryRouteImport } from './routes/library'
+import { Route as HomeRouteImport } from './routes/home'
+import { Route as CustomerServiceRouteImport } from './routes/customer-service'
+import { Route as CustomerChatRouteImport } from './routes/customer-chat'
+import { Route as CollabRouteImport } from './routes/collab'
+import { Route as ChatRouteImport } from './routes/chat'
+import { Route as AboutUsRouteImport } from './routes/about-us'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as OnboardingStepRouteImport } from './routes/onboarding.$step'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SigninRoute = SigninRouteImport.update({
+  id: '/signin',
+  path: '/signin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LibraryRoute = LibraryRouteImport.update({
+  id: '/library',
+  path: '/library',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HomeRoute = HomeRouteImport.update({
+  id: '/home',
+  path: '/home',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CustomerServiceRoute = CustomerServiceRouteImport.update({
+  id: '/customer-service',
+  path: '/customer-service',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CustomerChatRoute = CustomerChatRouteImport.update({
+  id: '/customer-chat',
+  path: '/customer-chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CollabRoute = CollabRouteImport.update({
+  id: '/collab',
+  path: '/collab',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChatRoute = ChatRouteImport.update({
+  id: '/chat',
+  path: '/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AboutUsRoute = AboutUsRouteImport.update({
+  id: '/about-us',
+  path: '/about-us',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -31,30 +85,103 @@ const OnboardingStepRoute = OnboardingStepRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/about-us': typeof AboutUsRoute
+  '/chat': typeof ChatRoute
+  '/collab': typeof CollabRoute
+  '/customer-chat': typeof CustomerChatRoute
+  '/customer-service': typeof CustomerServiceRoute
+  '/home': typeof HomeRoute
+  '/library': typeof LibraryRoute
+  '/pricing': typeof PricingRoute
+  '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
   '/onboarding/$step': typeof OnboardingStepRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/about-us': typeof AboutUsRoute
+  '/chat': typeof ChatRoute
+  '/collab': typeof CollabRoute
+  '/customer-chat': typeof CustomerChatRoute
+  '/customer-service': typeof CustomerServiceRoute
+  '/home': typeof HomeRoute
+  '/library': typeof LibraryRoute
+  '/pricing': typeof PricingRoute
+  '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
   '/onboarding/$step': typeof OnboardingStepRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/about-us': typeof AboutUsRoute
+  '/chat': typeof ChatRoute
+  '/collab': typeof CollabRoute
+  '/customer-chat': typeof CustomerChatRoute
+  '/customer-service': typeof CustomerServiceRoute
+  '/home': typeof HomeRoute
+  '/library': typeof LibraryRoute
+  '/pricing': typeof PricingRoute
+  '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
   '/onboarding/$step': typeof OnboardingStepRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/signup' | '/onboarding/$step'
+  fullPaths:
+    | '/'
+    | '/about-us'
+    | '/chat'
+    | '/collab'
+    | '/customer-chat'
+    | '/customer-service'
+    | '/home'
+    | '/library'
+    | '/pricing'
+    | '/signin'
+    | '/signup'
+    | '/onboarding/$step'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/signup' | '/onboarding/$step'
-  id: '__root__' | '/' | '/signup' | '/onboarding/$step'
+  to:
+    | '/'
+    | '/about-us'
+    | '/chat'
+    | '/collab'
+    | '/customer-chat'
+    | '/customer-service'
+    | '/home'
+    | '/library'
+    | '/pricing'
+    | '/signin'
+    | '/signup'
+    | '/onboarding/$step'
+  id:
+    | '__root__'
+    | '/'
+    | '/about-us'
+    | '/chat'
+    | '/collab'
+    | '/customer-chat'
+    | '/customer-service'
+    | '/home'
+    | '/library'
+    | '/pricing'
+    | '/signin'
+    | '/signup'
+    | '/onboarding/$step'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AboutUsRoute: typeof AboutUsRoute
+  ChatRoute: typeof ChatRoute
+  CollabRoute: typeof CollabRoute
+  CustomerChatRoute: typeof CustomerChatRoute
+  CustomerServiceRoute: typeof CustomerServiceRoute
+  HomeRoute: typeof HomeRoute
+  LibraryRoute: typeof LibraryRoute
+  PricingRoute: typeof PricingRoute
+  SigninRoute: typeof SigninRoute
   SignupRoute: typeof SignupRoute
   OnboardingStepRoute: typeof OnboardingStepRoute
 }
@@ -66,6 +193,69 @@ declare module '@tanstack/react-router' {
       path: '/signup'
       fullPath: '/signup'
       preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/signin': {
+      id: '/signin'
+      path: '/signin'
+      fullPath: '/signin'
+      preLoaderRoute: typeof SigninRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/library': {
+      id: '/library'
+      path: '/library'
+      fullPath: '/library'
+      preLoaderRoute: typeof LibraryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/home': {
+      id: '/home'
+      path: '/home'
+      fullPath: '/home'
+      preLoaderRoute: typeof HomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/customer-service': {
+      id: '/customer-service'
+      path: '/customer-service'
+      fullPath: '/customer-service'
+      preLoaderRoute: typeof CustomerServiceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/customer-chat': {
+      id: '/customer-chat'
+      path: '/customer-chat'
+      fullPath: '/customer-chat'
+      preLoaderRoute: typeof CustomerChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/collab': {
+      id: '/collab'
+      path: '/collab'
+      fullPath: '/collab'
+      preLoaderRoute: typeof CollabRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/chat': {
+      id: '/chat'
+      path: '/chat'
+      fullPath: '/chat'
+      preLoaderRoute: typeof ChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/about-us': {
+      id: '/about-us'
+      path: '/about-us'
+      fullPath: '/about-us'
+      preLoaderRoute: typeof AboutUsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -87,9 +277,28 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AboutUsRoute: AboutUsRoute,
+  ChatRoute: ChatRoute,
+  CollabRoute: CollabRoute,
+  CustomerChatRoute: CustomerChatRoute,
+  CustomerServiceRoute: CustomerServiceRoute,
+  HomeRoute: HomeRoute,
+  LibraryRoute: LibraryRoute,
+  PricingRoute: PricingRoute,
+  SigninRoute: SigninRoute,
   SignupRoute: SignupRoute,
   OnboardingStepRoute: OnboardingStepRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
