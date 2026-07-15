@@ -15,6 +15,9 @@ import {
 import { useState, useRef, useEffect, type FormEvent } from "react";
 import aiSphereImg from "@/assets/my-ai.png";
 
+type Message = { sender: "user" | "agent"; text: string };
+type AttachedFile = { name: string; type: string; previewUrl?: string };
+
 export const Route = createFileRoute("/chat")({
   head: () => ({
     meta: [
@@ -24,11 +27,6 @@ export const Route = createFileRoute("/chat")({
   }),
   component: ChatSupport,
 });
-
-type Message = {
-  sender: "user" | "agent";
-  text: string;
-};
 
 const popularPromptsList = [
   { text: "Explain photosynthesis", subject: "Biology", icon: "🌱" },
@@ -44,58 +42,40 @@ const allPromptsList = [
   { text: "Balance this chemical equation: H2 + O2 = H2O", subject: "Chemistry", icon: "🧪" },
 ];
 
-// Progressive Typing Animation Bubble
 function TypedMessageBubble({ text }: { text: string }) {
   const [typedText, setTypedText] = useState("");
-
   useEffect(() => {
-    let currentIndex = 0;
-    const interval = setInterval(() => {
-      if (currentIndex < text.length) {
-        setTypedText(text.slice(0, currentIndex + 1));
-        currentIndex++;
-      } else {
-        clearInterval(interval);
-      }
-    }, 8); // Fast, fluid typing animation (speed 1)
-    return () => clearInterval(interval);
+    let i = 0;
+    const iv = setInterval(() => {
+      if (i < text.length) { setTypedText(text.slice(0, i + 1)); i++; }
+      else clearInterval(iv);
+    }, 4);
+    return () => clearInterval(iv);
   }, [text]);
-
   return <FormatAiResponse text={typedText} />;
 }
 
-// Rich formatter helper to output clean Markdown-like headers and bullets in chat responses
 function FormatAiResponse({ text }: { text: string }) {
   const lines = text.split("\n");
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       {lines.map((line, idx) => {
-        // Headers
         if (line.startsWith("### ") || line.startsWith("## ")) {
-          const content = line.replace(/^(###|##)\s+/, "");
-          return <h4 key={idx} className="text-sm font-bold text-white mt-3 mb-1">{content}</h4>;
+          return <h4 key={idx} className="text-sm font-bold text-white mt-3 mb-1">{line.replace(/^(###|##)\s+/, "")}</h4>;
         }
-        // Bullet points
         if (line.trim().startsWith("- ") || line.trim().startsWith("* ")) {
-          const content = line.trim().replace(/^(-\s*|\*\s*)/, "");
-          return (
-            <li key={idx} className="ml-4 list-disc text-white/80 text-sm leading-relaxed">
-              {parseBoldText(content)}
-            </li>
-          );
+          return <li key={idx} className="ml-4 list-disc text-white/85 text-sm leading-relaxed">{parseBold(line.trim().replace(/^(-\s*|\*\s*)/, ""))}</li>;
         }
-        // Normal text
-        if (line.trim() === "") return <div key={idx} className="h-2" />;
-        return <p key={idx} className="text-sm text-white/90 leading-relaxed">{parseBoldText(line)}</p>;
+        if (line.trim() === "") return <div key={idx} className="h-1.5" />;
+        return <p key={idx} className="text-sm text-white/90 leading-relaxed">{parseBold(line)}</p>;
       })}
     </div>
   );
 }
 
-// Simple bold parser
-function parseBoldText(text: string) {
+function parseBold(text: string) {
   const parts = text.split(/\*\*(.*?)\*\*/g);
-  return parts.map((part, i) => (i % 2 === 1 ? <strong key={i} className="font-bold text-white">{part}</strong> : part));
+  return parts.map((p, i) => i % 2 === 1 ? <strong key={i} className="font-bold text-white">{p}</strong> : p);
 }
 
 function ChatSupport() {
@@ -105,64 +85,40 @@ function ChatSupport() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showAllPrompts, setShowAllPrompts] = useState(false);
-
-  // Plus media button dropdown state
   const [showAttachments, setShowAttachments] = useState(false);
-  const [attachedFile, setAttachedFile] = useState<{ name: string; type: string } | null>(null);
-
+  const [attachedFile, setAttachedFile] = useState<AttachedFile | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (chatStarted) {
-      scrollToBottom();
-    }
+    if (chatStarted) messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading, chatStarted]);
 
-  const triggerPrompt = (promptText: string) => {
-    setChatStarted(true);
-    handleSendProcess(promptText);
-  };
+  const triggerPrompt = (text: string) => { setChatStarted(true); handleSendProcess(text); };
 
   const handleSend = (e: FormEvent) => {
     e.preventDefault();
     if (!inputVal.trim() && !attachedFile) return;
     if (isLoading) return;
-    
     let text = inputVal.trim();
-    if (attachedFile) {
-      text = `[Attached ${attachedFile.type}: ${attachedFile.name}]\n` + text;
-    }
-    
+    if (attachedFile && !attachedFile.previewUrl) text = `[Attached ${attachedFile.type}: ${attachedFile.name}]\n` + text;
     setInputVal("");
+    if (attachedFile?.previewUrl) URL.revokeObjectURL(attachedFile.previewUrl);
     setAttachedFile(null);
     setChatStarted(true);
     handleSendProcess(text);
   };
 
   const handleSendProcess = async (userText: string) => {
-    setMessages((prev) => [...prev, { sender: "user", text: userText }]);
+    setMessages(prev => [...prev, { sender: "user", text: userText }]);
     setIsLoading(true);
-
     const startTime = Date.now();
-
     try {
-      const chatHistory = messages.map((m) => ({
-        role: m.sender === "user" ? "user" : ("assistant" as const),
-        content: m.text,
-      }));
-
-      chatHistory.push({ role: "user", content: userText });
-
-      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      const history = messages.map(m => ({ role: m.sender === "user" ? "user" : "assistant" as const, content: m.text }));
+      history.push({ role: "user", content: userText });
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_GROQ_API_KEY}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_GROQ_API_KEY}` },
         body: JSON.stringify({
           model: "llama-3.3-70b-versatile",
           messages: [
@@ -171,375 +127,188 @@ function ChatSupport() {
               content: `You are Mr. Simon, a strict, expert, and highly analytical AI Tutor on The Flow app. You ONLY teach academic subjects: Mathematics, Physics, Chemistry, Biology, Computer Science, History, Geography, English, Literature, and Economics.
 
 STRICT RULES:
-- If the user says anything unrelated to academics (greetings like "hello", insults, emotions, personal topics, casual chat, or anything not a school subject), respond with ONLY this one sentence: "I'm here strictly to help you with your studies. Ask me any academic question and I'll get right to it!" — nothing more.
-- NEVER engage with emotions, personal feelings, insults, or off-topic messages in any way.
-- NEVER counsel, empathize, or give life advice.
-- For academic questions: break down concepts thoroughly step-by-step, include clear explanations, bullet points, and practical examples.
-- Always include a "Common Pitfalls" warning section for academic topics.
-- Format responses with section headers (###) and bulleted lists (-).
-- Do not mention or reference images, diagrams, or visual sketches.`,
+- If the user says anything unrelated to academics (greetings, insults, emotions, casual chat), respond ONLY with: "I'm here strictly to help you with your studies. Ask me any academic question and I'll get right to it!" — nothing more.
+- NEVER engage with off-topic messages.
+- CRITICAL: When a user asks HOW something works or to EXPLAIN something, begin your answer IMMEDIATELY with the mechanism/process/explanation — do NOT open with a definition. Definitions come later if needed.
+- Break down concepts step-by-step with clear explanations, bullet points, and examples.
+- Always include a "### Common Pitfalls" section.
+- Format with ### headers and - bullet lists.
+- Never mention images or diagrams.`,
             },
-            ...chatHistory,
+            ...history,
           ],
           temperature: 0.75,
-          max_tokens: 450,
+          max_tokens: 500,
         }),
       });
-
-      if (!response.ok) {
-        throw new Error("API call failed");
-      }
-
-      const data = await response.json();
-      const reply = data.choices?.[0]?.message?.content || "I apologize, could you repeat that?";
-      
-      const elapsed = Date.now() - startTime;
-      const remainingDelay = Math.max(0, 4000 - elapsed); // Force 4-second delay for human-like response
-
-      setTimeout(() => {
-        setIsLoading(false);
-        setMessages((prev) => [...prev, { sender: "agent", text: reply }]);
-      }, remainingDelay);
-
-    } catch (error) {
-      console.error(error);
-      const elapsed = Date.now() - startTime;
-      const remainingDelay = Math.max(0, 4000 - elapsed);
-      
-      setTimeout(() => {
-        setIsLoading(false);
-        setMessages((prev) => [
-          ...prev,
-          {
-            sender: "agent",
-            text: "I'm having a bit of trouble connecting to your tutor right now. Please try again or check your network.",
-          },
-        ]);
-      }, remainingDelay);
+      if (!res.ok) throw new Error("API failed");
+      const data = await res.json();
+      const reply = data.choices?.[0]?.message?.content || "Could you repeat that?";
+      const delay = Math.max(0, 4000 - (Date.now() - startTime));
+      setTimeout(() => { setIsLoading(false); setMessages(prev => [...prev, { sender: "agent", text: reply }]); }, delay);
+    } catch {
+      const delay = Math.max(0, 4000 - (Date.now() - startTime));
+      setTimeout(() => { setIsLoading(false); setMessages(prev => [...prev, { sender: "agent", text: "Having trouble connecting. Please check your network." }]); }, delay);
     }
   };
 
-  const startNewChat = () => {
-    setMessages([]);
-    setChatStarted(false);
-    setShowAllPrompts(false);
-    setAttachedFile(null);
-  };
+  const startNewChat = () => { setMessages([]); setChatStarted(false); setShowAllPrompts(false); if (attachedFile?.previewUrl) URL.revokeObjectURL(attachedFile.previewUrl); setAttachedFile(null); };
 
-  const selectAttachment = (name: string, type: string) => {
-    setAttachedFile({ name, type });
+  const selectAttachment = (name: string, type: string) => { if (attachedFile?.previewUrl) URL.revokeObjectURL(attachedFile.previewUrl); setAttachedFile({ name, type }); setShowAttachments(false); };
+
+  const handlePhotoSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (attachedFile?.previewUrl) URL.revokeObjectURL(attachedFile.previewUrl);
+    setAttachedFile({ name: file.name, type: "Photo", previewUrl: URL.createObjectURL(file) });
     setShowAttachments(false);
+    e.target.value = "";
   };
 
   const promptsToDisplay = showAllPrompts ? allPromptsList : popularPromptsList;
 
+  const AttachmentDropdown = () => (
+    <div className="absolute bottom-14 left-0 z-50 w-44 rounded-2xl border border-white/10 bg-[#1a1a1a] p-2 shadow-2xl">
+      <button type="button" onClick={() => { photoInputRef.current?.click(); setShowAttachments(false); }} className="w-full rounded-xl px-3 py-2 flex items-center gap-3 text-xs hover:bg-white/[0.06] text-left transition-colors">
+        <Camera className="h-4 w-4 text-violet-400" /> Photos
+      </button>
+      <button type="button" onClick={() => selectAttachment("video_lecture.mp4", "Video")} className="w-full rounded-xl px-3 py-2 flex items-center gap-3 text-xs hover:bg-white/[0.06] text-left transition-colors">
+        <Video className="h-4 w-4 text-blue-400" /> Videos
+      </button>
+      <button type="button" onClick={() => selectAttachment("tutor_session", "Video Call")} className="w-full rounded-xl px-3 py-2 flex items-center gap-3 text-xs hover:bg-white/[0.06] text-left transition-colors">
+        <PhoneCall className="h-4 w-4 text-emerald-400" /> Video Call
+      </button>
+      <button type="button" onClick={() => selectAttachment("notes.pdf", "PDF")} className="w-full rounded-xl px-3 py-2 flex items-center gap-3 text-xs hover:bg-white/[0.06] text-left transition-colors">
+        <FileText className="h-4 w-4 text-amber-400" /> PDF
+      </button>
+    </div>
+  );
+
   return (
     <div className="fixed inset-0 bg-[#111111] text-white flex justify-center overflow-hidden page-transition">
       <div className="relative w-full max-w-md h-full flex flex-col">
-        
-        {/* Header with back arrow */}
-        <header className="flex items-center justify-between px-6 pt-6 pb-4 flex-shrink-0">
+
+        {/* Hidden photo input */}
+        <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoSelected} />
+
+        {/* Header */}
+        <header className="flex items-center justify-between px-6 pt-6 pb-4 flex-shrink-0 bg-[#111111]">
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate({ to: "/home" })}
-              className="text-white/70 hover:text-white p-1 transition-colors"
-              aria-label="Back to Home"
-            >
+            <button onClick={() => navigate({ to: "/home" })} className="text-white/70 hover:text-white p-1 transition-colors" aria-label="Back">
               <ArrowLeft className="h-6 w-6" strokeWidth={1.8} />
             </button>
-            <h1 className="text-xl font-bold tracking-tight text-white">AI Tutor</h1>
+            <h1 className="text-xl font-bold tracking-tight">AI Tutor</h1>
           </div>
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => alert("History feature coming soon!")}
-              className="text-white/70 hover:text-white p-1 transition-colors"
-              aria-label="Chat History"
-            >
-              <History className="h-5 w-5" strokeWidth={1.8} />
-            </button>
-            <button
-              onClick={startNewChat}
-              className="text-white/70 hover:text-white p-1 transition-colors"
-              aria-label="New Chat"
-            >
-              <MessageSquarePlus className="h-5 w-5" strokeWidth={1.8} />
-            </button>
+            <button onClick={() => alert("Coming soon!")} className="text-white/70 hover:text-white p-1 transition-colors"><History className="h-5 w-5" strokeWidth={1.8} /></button>
+            <button onClick={startNewChat} className="text-white/70 hover:text-white p-1 transition-colors"><MessageSquarePlus className="h-5 w-5" strokeWidth={1.8} /></button>
           </div>
         </header>
 
-        {/* Scrollable Container */}
-        <div className="flex-1 overflow-y-auto px-6 pb-28">
-          
+        {/* Scrollable */}
+        <div className="flex-1 overflow-y-auto px-6 pb-36">
           {!chatStarted ? (
-            /* ================= WELCOME SCREEN ================= */
             <div className="flex flex-col items-center justify-center pt-2">
-              
-              {/* Glowing Sphere Image - larger, no glowing rings or shadows behind */}
               <div className="w-52 h-52 my-6 flex items-center justify-center">
-                <img
-                  src={aiSphereImg}
-                  alt="AI Sphere"
-                  className="w-48 h-48 object-cover rounded-full"
-                />
+                <img src={aiSphereImg} alt="AI" className="w-48 h-48 object-cover rounded-full" />
               </div>
-
-              {/* Greeting */}
               <div className="text-center mb-8">
-                <h2 className="text-xl font-bold text-white">Hi Emmanuel!</h2>
+                <h2 className="text-xl font-bold">Hi Emmanuel!</h2>
                 <p className="text-sm text-white/50 mt-1">How can I help you today?</p>
               </div>
-
-              {/* Popular Prompts Title */}
               <div className="w-full flex items-center justify-between mb-4">
                 <span className="text-xs font-semibold uppercase tracking-[0.1em] text-white/35">Popular Prompts</span>
-                <button
-                  onClick={() => setShowAllPrompts(!showAllPrompts)}
-                  className="text-xs text-white/50 hover:text-white transition-colors"
-                >
-                  {showAllPrompts ? "Show Less" : "See All"}
-                </button>
+                <button onClick={() => setShowAllPrompts(!showAllPrompts)} className="text-xs text-white/50 hover:text-white transition-colors">{showAllPrompts ? "Show Less" : "See All"}</button>
               </div>
-
-              {/* Prompts Cards */}
               <div className="w-full space-y-3 mb-8">
-                {promptsToDisplay.map((prompt, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => triggerPrompt(prompt.text)}
-                    className="w-full rounded-2xl bg-white/[0.04] border border-white/5 p-4 flex items-center justify-between hover:bg-white/[0.06] transition-colors text-left"
-                  >
+                {promptsToDisplay.map((p, i) => (
+                  <button key={i} onClick={() => triggerPrompt(p.text)} className="w-full rounded-2xl bg-white/[0.04] border border-white/5 p-4 flex items-center justify-between hover:bg-white/[0.06] transition-colors text-left">
                     <div className="flex items-center gap-4">
-                      <div className="h-10 w-10 rounded-xl bg-white/[0.04] flex items-center justify-center text-lg flex-shrink-0">
-                        {prompt.icon}
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-semibold text-white leading-snug">{prompt.text}</h3>
-                        <p className="text-xs text-white/40 mt-0.5">{prompt.subject}</p>
-                      </div>
+                      <div className="h-10 w-10 rounded-xl bg-white/[0.04] flex items-center justify-center text-lg flex-shrink-0">{p.icon}</div>
+                      <div><h3 className="text-sm font-semibold leading-snug">{p.text}</h3><p className="text-xs text-white/40 mt-0.5">{p.subject}</p></div>
                     </div>
                     <ChevronRight className="h-4 w-4 text-white/20" />
                   </button>
                 ))}
               </div>
-
-              {/* Start new chat text area input */}
+              {/* Welcome screen input */}
               <div className="w-full relative">
                 <span className="text-xs font-semibold uppercase tracking-[0.1em] text-white/35 block mb-3">Start a new chat</span>
-                
-                {/* Media Attachment Dropdown Menu */}
-                {showAttachments && (
-                  <div className="absolute bottom-24 left-3 z-50 w-44 rounded-2xl border border-white/10 bg-[#1a1a1a] p-2 shadow-2xl animate-page-slide">
-                    <button
-                      type="button"
-                      onClick={() => selectAttachment("photo_attachment.jpg", "Photo")}
-                      className="w-full rounded-xl px-3 py-2 flex items-center gap-3 text-xs hover:bg-white/[0.06] text-left transition-colors"
-                    >
-                      <Camera className="h-4 w-4 text-violet-400" /> Photos
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => selectAttachment("video_lecture.mp4", "Video")}
-                      className="w-full rounded-xl px-3 py-2 flex items-center gap-3 text-xs hover:bg-white/[0.06] text-left transition-colors"
-                    >
-                      <Video className="h-4 w-4 text-blue-400" /> Videos
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => selectAttachment("tutor_session", "Video Call")}
-                      className="w-full rounded-xl px-3 py-2 flex items-center gap-3 text-xs hover:bg-white/[0.06] text-left transition-colors"
-                    >
-                      <PhoneCall className="h-4 w-4 text-emerald-400" /> Video Call
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => selectAttachment("notes_ch4.pdf", "PDF")}
-                      className="w-full rounded-xl px-3 py-2 flex items-center gap-3 text-xs hover:bg-white/[0.06] text-left transition-colors"
-                    >
-                      <FileText className="h-4 w-4 text-amber-400" /> PDF
-                    </button>
+                {showAttachments && <AttachmentDropdown />}
+                {attachedFile?.previewUrl && (
+                  <div className="relative inline-block mb-2">
+                    <img src={attachedFile.previewUrl} alt="Preview" className="h-16 w-16 rounded-xl object-cover border border-white/10" />
+                    <button type="button" onClick={() => { URL.revokeObjectURL(attachedFile.previewUrl!); setAttachedFile(null); }} className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-black/80 border border-white/20 flex items-center justify-center hover:bg-black"><X className="h-2.5 w-2.5" /></button>
                   </div>
                 )}
-
-                {/* Attached File Indicator */}
-                {attachedFile && (
+                {attachedFile && !attachedFile.previewUrl && (
                   <div className="flex items-center justify-between rounded-xl bg-indigo-500/10 border border-indigo-500/20 px-3 py-2 text-xs text-indigo-300 mb-2">
-                    <span className="flex items-center gap-2">
-                      <FileText className="h-3.5 w-3.5" />
-                      {attachedFile.type}: {attachedFile.name}
-                    </span>
-                    <button onClick={() => setAttachedFile(null)} className="text-white/40 hover:text-white transition-colors">
-                      <X className="h-3.5 w-3.5" />
-                    </button>
+                    <span className="flex items-center gap-2"><FileText className="h-3.5 w-3.5" />{attachedFile.type}: {attachedFile.name}</span>
+                    <button onClick={() => setAttachedFile(null)}><X className="h-3.5 w-3.5 text-white/40 hover:text-white" /></button>
                   </div>
                 )}
-
-                {/* Unified input field: plus and submit inside the container */}
                 <form onSubmit={handleSend} className="relative flex items-center gap-2 w-full rounded-2xl border border-white/10 bg-white/[0.02] pl-3 pr-2 py-1.5 focus-within:border-white/20">
-                  <button
-                    type="button"
-                    onClick={() => setShowAttachments(!showAttachments)}
-                    className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/[0.04] text-white/60 hover:text-white transition-colors"
-                    aria-label="Add attachment"
-                  >
-                    <Plus className="h-5 w-5" />
-                  </button>
-
-                  <textarea
-                    rows={1}
-                    placeholder="Ask anything..."
-                    value={inputVal}
-                    onChange={(e) => setInputVal(e.target.value)}
-                    className="flex-1 bg-transparent border-0 outline-none text-white text-sm placeholder:text-white/30 h-9 py-2 resize-none"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSend(e);
-                      }
-                    }}
-                  />
-                  <button
-                    type="submit"
-                    disabled={(!inputVal.trim() && !attachedFile) || isLoading}
-                    className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-black disabled:opacity-40 hover:scale-105 active:scale-95 transition-transform flex-shrink-0"
-                    aria-label="Submit Prompt"
-                  >
-                    <Send className="h-3.5 w-3.5" strokeWidth={2.5} />
-                  </button>
+                  <button type="button" onClick={() => setShowAttachments(!showAttachments)} className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/[0.04] text-white/60 hover:text-white transition-colors"><Plus className="h-5 w-5" /></button>
+                  <textarea rows={1} placeholder="Ask anything..." value={inputVal} onChange={e => setInputVal(e.target.value)} className="flex-1 bg-transparent border-0 outline-none text-white text-sm placeholder:text-white/30 h-9 py-2 resize-none" onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(e); } }} />
+                  <button type="submit" disabled={(!inputVal.trim() && !attachedFile) || isLoading} className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-black disabled:opacity-40 hover:scale-105 active:scale-95 transition-transform flex-shrink-0"><Send className="h-3.5 w-3.5" strokeWidth={2.5} /></button>
                 </form>
-                <p className="text-[10px] text-white/20 text-center mt-3">
-                  AI can make mistakes. Check important info.
-                </p>
+                <p className="text-[10px] text-white/20 text-center mt-3">AI can make mistakes. Check important info.</p>
               </div>
-
             </div>
           ) : (
-            /* ================= ACTIVE CHAT THREAD SCREEN ================= */
-            <div className="space-y-4 pt-2">
+            <div className="space-y-5 pt-2">
               {messages.map((msg, i) => (
-                <div
-                  key={i}
-                  className={`flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"} gap-1`}
-                >
-                  <span className="text-[10px] text-white/30 px-1">
-                    {msg.sender === "user" ? "You" : "Mr. Simon"}
-                  </span>
-                  <div
-                    className={`max-w-[90%] rounded-2xl px-4 py-3 shadow-[0_4px_12px_rgba(0,0,0,0.15)] ${
-                      msg.sender === "user"
-                        ? "bg-[#6366f1] text-white rounded-tr-none"
-                        : "bg-white/[0.03] border border-white/10 text-white/90 rounded-tl-none"
-                    }`}
-                  >
-                    {msg.sender === "user" ? (
+                <div key={i} className={`flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"} gap-1`}>
+                  <span className="text-[10px] text-white/30 px-1">{msg.sender === "user" ? "You" : "Mr. Simon"}</span>
+                  {msg.sender === "user" ? (
+                    <div className="max-w-[85%] rounded-2xl px-4 py-3 bg-[#6366f1] text-white rounded-tr-none">
                       <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.text}</p>
-                    ) : (
-                      /* Animate typing of speed 1 for agent's message if it is the latest one */
-                      i === messages.length - 1 ? (
-                        <TypedMessageBubble text={msg.text} />
-                      ) : (
-                        <FormatAiResponse text={msg.text} />
-                      )
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="w-full pr-2">
+                      {i === messages.length - 1 ? <TypedMessageBubble text={msg.text} /> : <FormatAiResponse text={msg.text} />}
+                    </div>
+                  )}
                 </div>
               ))}
-
-              {/* Loader */}
               {isLoading && (
                 <div className="flex flex-col items-start gap-1">
                   <span className="text-[10px] text-white/30 px-1">Mr. Simon</span>
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-xs text-white/50 rounded-tl-none animate-pulse">
-                    Typing...
-                  </div>
+                  <div className="px-1 py-2 text-xs text-white/40 animate-pulse">Thinking...</div>
                 </div>
               )}
-
               <div ref={messagesEndRef} />
             </div>
           )}
-
         </div>
 
-        {/* Input Bar Overlay (Only visible in active chat mode) */}
+        {/* Fixed input bar — only in chat mode */}
         {chatStarted && (
-          <div className="absolute bottom-0 left-0 right-0 border-t border-white/5 p-4 bg-[#111111]/95 backdrop-blur-md pb-6">
-            
-            {/* Media Attachment Dropdown Menu in Chat Mode */}
-            {showAttachments && (
-              <div className="absolute bottom-20 left-4 z-50 w-44 rounded-2xl border border-white/10 bg-[#1a1a1a] p-2 shadow-2xl animate-page-slide">
-                <button
-                  type="button"
-                  onClick={() => selectAttachment("photo_attachment.jpg", "Photo")}
-                  className="w-full rounded-xl px-3 py-2 flex items-center gap-3 text-xs hover:bg-white/[0.06] text-left transition-colors"
-                >
-                  <Camera className="h-4 w-4 text-violet-400" /> Photos
-                </button>
-                <button
-                  type="button"
-                  onClick={() => selectAttachment("video_lecture.mp4", "Video")}
-                  className="w-full rounded-xl px-3 py-2 flex items-center gap-3 text-xs hover:bg-white/[0.06] text-left transition-colors"
-                >
-                  <Video className="h-4 w-4 text-blue-400" /> Videos
-                </button>
-                <button
-                  type="button"
-                  onClick={() => selectAttachment("tutor_session", "Video Call")}
-                  className="w-full rounded-xl px-3 py-2 flex items-center gap-3 text-xs hover:bg-white/[0.06] text-left transition-colors"
-                >
-                  <PhoneCall className="h-4 w-4 text-emerald-400" /> Video Call
-                </button>
-                <button
-                  type="button"
-                  onClick={() => selectAttachment("notes_ch4.pdf", "PDF")}
-                  className="w-full rounded-xl px-3 py-2 flex items-center gap-3 text-xs hover:bg-white/[0.06] text-left transition-colors"
-                >
-                  <FileText className="h-4 w-4 text-amber-400" /> PDF
-                </button>
-              </div>
-            )}
-
-            {/* Attached File Indicator */}
-            {attachedFile && (
-              <div className="flex items-center justify-between rounded-xl bg-indigo-500/10 border border-indigo-500/20 px-3 py-1.5 text-[11px] text-indigo-300 mb-2 max-w-xs">
-                <span className="flex items-center gap-2">
-                  <FileText className="h-3.5 w-3.5" />
-                  {attachedFile.type}: {attachedFile.name}
-                </span>
-                <button onClick={() => setAttachedFile(null)} className="text-white/40 hover:text-white transition-colors">
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            )}
-
-            {/* Unified Input: Plus button inside */}
-            <form onSubmit={handleSend} className="relative flex items-center gap-2 w-full rounded-xl border border-white/10 bg-white/[0.02] pl-3 pr-2 py-1.5 focus-within:border-white/20">
-              <button
-                type="button"
-                onClick={() => setShowAttachments(!showAttachments)}
-                className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/[0.04] text-white/60 hover:text-white transition-colors flex-shrink-0"
-                aria-label="Add attachment"
-              >
-                <Plus className="h-5 w-5" />
-              </button>
-
-              <input
-                type="text"
-                placeholder="Ask anything..."
-                value={inputVal}
-                onChange={(e) => setInputVal(e.target.value)}
-                disabled={isLoading}
-                className="flex-1 bg-transparent border-0 outline-none text-white text-sm placeholder:text-white/30 h-9 py-2"
-              />
-              
-              <button
-                type="submit"
-                disabled={(!inputVal.trim() && !attachedFile) || isLoading}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-black disabled:opacity-40 hover:scale-105 active:scale-95 transition-transform flex-shrink-0"
-                aria-label="Send message"
-              >
-                <Send className="h-3.5 w-3.5" strokeWidth={2.5} />
-              </button>
-            </form>
+          <div className="fixed bottom-0 left-0 right-0 z-50">
+            <div className="max-w-md mx-auto bg-[#111111]/95 backdrop-blur-md border-t border-white/5 px-4 pt-3 pb-6">
+              {showAttachments && (
+                <div className="relative">
+                  <AttachmentDropdown />
+                </div>
+              )}
+              {attachedFile?.previewUrl && (
+                <div className="relative inline-block mb-2">
+                  <img src={attachedFile.previewUrl} alt="Preview" className="h-16 w-16 rounded-xl object-cover border border-white/10" />
+                  <button type="button" onClick={() => { URL.revokeObjectURL(attachedFile.previewUrl!); setAttachedFile(null); }} className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-black/80 border border-white/20 flex items-center justify-center hover:bg-black"><X className="h-2.5 w-2.5" /></button>
+                </div>
+              )}
+              {attachedFile && !attachedFile.previewUrl && (
+                <div className="flex items-center justify-between rounded-xl bg-indigo-500/10 border border-indigo-500/20 px-3 py-1.5 text-[11px] text-indigo-300 mb-2">
+                  <span className="flex items-center gap-2"><FileText className="h-3.5 w-3.5" />{attachedFile.type}: {attachedFile.name}</span>
+                  <button onClick={() => setAttachedFile(null)}><X className="h-3.5 w-3.5 text-white/40 hover:text-white" /></button>
+                </div>
+              )}
+              <form onSubmit={handleSend} className="flex items-center gap-2 w-full rounded-xl border border-white/10 bg-white/[0.02] pl-3 pr-2 py-1.5 focus-within:border-white/20">
+                <button type="button" onClick={() => setShowAttachments(!showAttachments)} className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/[0.04] text-white/60 hover:text-white transition-colors flex-shrink-0"><Plus className="h-5 w-5" /></button>
+                <input type="text" placeholder="Ask anything..." value={inputVal} onChange={e => setInputVal(e.target.value)} disabled={isLoading} className="flex-1 bg-transparent border-0 outline-none text-white text-sm placeholder:text-white/30 h-9 py-2" />
+                <button type="submit" disabled={(!inputVal.trim() && !attachedFile) || isLoading} className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-black disabled:opacity-40 hover:scale-105 active:scale-95 transition-transform flex-shrink-0"><Send className="h-3.5 w-3.5" strokeWidth={2.5} /></button>
+              </form>
+            </div>
           </div>
         )}
 
