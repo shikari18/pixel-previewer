@@ -12,12 +12,14 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SigninRouteImport } from './routes/signin'
 import { Route as PricingRouteImport } from './routes/pricing'
+import { Route as MoreRouteImport } from './routes/more'
 import { Route as LibraryRouteImport } from './routes/library'
 import { Route as HomeRouteImport } from './routes/home'
 import { Route as CustomerServiceRouteImport } from './routes/customer-service'
 import { Route as CustomerChatRouteImport } from './routes/customer-chat'
 import { Route as CollabRouteImport } from './routes/collab'
 import { Route as ChatRouteImport } from './routes/chat'
+import { Route as CalendarRouteImport } from './routes/calendar'
 import { Route as AboutUsRouteImport } from './routes/about-us'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as OnboardingStepRouteImport } from './routes/onboarding.$step'
@@ -35,6 +37,11 @@ const SigninRoute = SigninRouteImport.update({
 const PricingRoute = PricingRouteImport.update({
   id: '/pricing',
   path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MoreRoute = MoreRouteImport.update({
+  id: '/more',
+  path: '/more',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LibraryRoute = LibraryRouteImport.update({
@@ -67,6 +74,11 @@ const ChatRoute = ChatRouteImport.update({
   path: '/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CalendarRoute = CalendarRouteImport.update({
+  id: '/calendar',
+  path: '/calendar',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AboutUsRoute = AboutUsRouteImport.update({
   id: '/about-us',
   path: '/about-us',
@@ -86,12 +98,14 @@ const OnboardingStepRoute = OnboardingStepRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about-us': typeof AboutUsRoute
+  '/calendar': typeof CalendarRoute
   '/chat': typeof ChatRoute
   '/collab': typeof CollabRoute
   '/customer-chat': typeof CustomerChatRoute
   '/customer-service': typeof CustomerServiceRoute
   '/home': typeof HomeRoute
   '/library': typeof LibraryRoute
+  '/more': typeof MoreRoute
   '/pricing': typeof PricingRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
@@ -100,12 +114,14 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about-us': typeof AboutUsRoute
+  '/calendar': typeof CalendarRoute
   '/chat': typeof ChatRoute
   '/collab': typeof CollabRoute
   '/customer-chat': typeof CustomerChatRoute
   '/customer-service': typeof CustomerServiceRoute
   '/home': typeof HomeRoute
   '/library': typeof LibraryRoute
+  '/more': typeof MoreRoute
   '/pricing': typeof PricingRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
@@ -115,12 +131,14 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/about-us': typeof AboutUsRoute
+  '/calendar': typeof CalendarRoute
   '/chat': typeof ChatRoute
   '/collab': typeof CollabRoute
   '/customer-chat': typeof CustomerChatRoute
   '/customer-service': typeof CustomerServiceRoute
   '/home': typeof HomeRoute
   '/library': typeof LibraryRoute
+  '/more': typeof MoreRoute
   '/pricing': typeof PricingRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
@@ -131,12 +149,14 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/about-us'
+    | '/calendar'
     | '/chat'
     | '/collab'
     | '/customer-chat'
     | '/customer-service'
     | '/home'
     | '/library'
+    | '/more'
     | '/pricing'
     | '/signin'
     | '/signup'
@@ -145,12 +165,14 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/about-us'
+    | '/calendar'
     | '/chat'
     | '/collab'
     | '/customer-chat'
     | '/customer-service'
     | '/home'
     | '/library'
+    | '/more'
     | '/pricing'
     | '/signin'
     | '/signup'
@@ -159,12 +181,14 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/about-us'
+    | '/calendar'
     | '/chat'
     | '/collab'
     | '/customer-chat'
     | '/customer-service'
     | '/home'
     | '/library'
+    | '/more'
     | '/pricing'
     | '/signin'
     | '/signup'
@@ -174,12 +198,14 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutUsRoute: typeof AboutUsRoute
+  CalendarRoute: typeof CalendarRoute
   ChatRoute: typeof ChatRoute
   CollabRoute: typeof CollabRoute
   CustomerChatRoute: typeof CustomerChatRoute
   CustomerServiceRoute: typeof CustomerServiceRoute
   HomeRoute: typeof HomeRoute
   LibraryRoute: typeof LibraryRoute
+  MoreRoute: typeof MoreRoute
   PricingRoute: typeof PricingRoute
   SigninRoute: typeof SigninRoute
   SignupRoute: typeof SignupRoute
@@ -207,6 +233,13 @@ declare module '@tanstack/react-router' {
       path: '/pricing'
       fullPath: '/pricing'
       preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/more': {
+      id: '/more'
+      path: '/more'
+      fullPath: '/more'
+      preLoaderRoute: typeof MoreRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/library': {
@@ -251,6 +284,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ChatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/calendar': {
+      id: '/calendar'
+      path: '/calendar'
+      fullPath: '/calendar'
+      preLoaderRoute: typeof CalendarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/about-us': {
       id: '/about-us'
       path: '/about-us'
@@ -278,12 +318,14 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutUsRoute: AboutUsRoute,
+  CalendarRoute: CalendarRoute,
   ChatRoute: ChatRoute,
   CollabRoute: CollabRoute,
   CustomerChatRoute: CustomerChatRoute,
   CustomerServiceRoute: CustomerServiceRoute,
   HomeRoute: HomeRoute,
   LibraryRoute: LibraryRoute,
+  MoreRoute: MoreRoute,
   PricingRoute: PricingRoute,
   SigninRoute: SigninRoute,
   SignupRoute: SignupRoute,
