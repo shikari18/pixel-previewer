@@ -20,6 +20,7 @@ import { Route as CustomerChatRouteImport } from './routes/customer-chat'
 import { Route as CollabRouteImport } from './routes/collab'
 import { Route as ChatRouteImport } from './routes/chat'
 import { Route as CalendarRouteImport } from './routes/calendar'
+import { Route as AiCallRouteImport } from './routes/ai-call'
 import { Route as AboutUsRouteImport } from './routes/about-us'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as OnboardingStepRouteImport } from './routes/onboarding.$step'
@@ -79,6 +80,11 @@ const CalendarRoute = CalendarRouteImport.update({
   path: '/calendar',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AiCallRoute = AiCallRouteImport.update({
+  id: '/ai-call',
+  path: '/ai-call',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AboutUsRoute = AboutUsRouteImport.update({
   id: '/about-us',
   path: '/about-us',
@@ -98,6 +104,7 @@ const OnboardingStepRoute = OnboardingStepRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about-us': typeof AboutUsRoute
+  '/ai-call': typeof AiCallRoute
   '/calendar': typeof CalendarRoute
   '/chat': typeof ChatRoute
   '/collab': typeof CollabRoute
@@ -114,6 +121,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about-us': typeof AboutUsRoute
+  '/ai-call': typeof AiCallRoute
   '/calendar': typeof CalendarRoute
   '/chat': typeof ChatRoute
   '/collab': typeof CollabRoute
@@ -131,6 +139,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/about-us': typeof AboutUsRoute
+  '/ai-call': typeof AiCallRoute
   '/calendar': typeof CalendarRoute
   '/chat': typeof ChatRoute
   '/collab': typeof CollabRoute
@@ -149,6 +158,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/about-us'
+    | '/ai-call'
     | '/calendar'
     | '/chat'
     | '/collab'
@@ -165,6 +175,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/about-us'
+    | '/ai-call'
     | '/calendar'
     | '/chat'
     | '/collab'
@@ -181,6 +192,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/about-us'
+    | '/ai-call'
     | '/calendar'
     | '/chat'
     | '/collab'
@@ -198,6 +210,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutUsRoute: typeof AboutUsRoute
+  AiCallRoute: typeof AiCallRoute
   CalendarRoute: typeof CalendarRoute
   ChatRoute: typeof ChatRoute
   CollabRoute: typeof CollabRoute
@@ -291,6 +304,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CalendarRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/ai-call': {
+      id: '/ai-call'
+      path: '/ai-call'
+      fullPath: '/ai-call'
+      preLoaderRoute: typeof AiCallRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/about-us': {
       id: '/about-us'
       path: '/about-us'
@@ -318,6 +338,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutUsRoute: AboutUsRoute,
+  AiCallRoute: AiCallRoute,
   CalendarRoute: CalendarRoute,
   ChatRoute: ChatRoute,
   CollabRoute: CollabRoute,

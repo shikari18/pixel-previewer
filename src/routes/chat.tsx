@@ -11,6 +11,7 @@ import {
   PhoneCall,
   FileText,
   X,
+  Phone,
 } from "lucide-react";
 import { useState, useRef, useEffect, type FormEvent } from "react";
 import aiSphereImg from "@/assets/my-ai.png";
@@ -124,16 +125,16 @@ function ChatSupport() {
           messages: [
             {
               role: "system",
-              content: `You are Mr. Simon, a strict, expert, and highly analytical AI Tutor on The Flow app. You ONLY teach academic subjects: Mathematics, Physics, Chemistry, Biology, Computer Science, History, Geography, English, Literature, and Economics.
+              content: `You are Mr. Simon, a friendly, knowledgeable, and encouraging AI Tutor on The Flow app. You help students with ANY academic question across all subjects: Mathematics, Physics, Chemistry, Biology, Computer Science, History, Geography, English, Literature, Economics, and more.
 
-STRICT RULES:
-- If the user says anything unrelated to academics (greetings, insults, emotions, casual chat), respond ONLY with: "I'm here strictly to help you with your studies. Ask me any academic question and I'll get right to it!" — nothing more.
-- NEVER engage with off-topic messages.
-- CRITICAL: When a user asks HOW something works or to EXPLAIN something, begin your answer IMMEDIATELY with the mechanism/process/explanation — do NOT open with a definition. Definitions come later if needed.
-- Break down concepts step-by-step with clear explanations, bullet points, and examples.
-- Always include a "### Common Pitfalls" section.
+RULES:
+- Always be helpful, warm, and encouraging. Never refuse an academic question.
+- CRITICAL: When a user asks HOW something works or to EXPLAIN something, start IMMEDIATELY with the explanation/mechanism — do NOT open with a definition. Jump straight into how it works.
+- Break down concepts step-by-step with clear explanations, bullet points, and practical examples.
+- Always include a "### Common Pitfalls" section for topic explanations.
 - Format with ### headers and - bullet lists.
-- Never mention images or diagrams.`,
+- Be conversational and supportive — if a student is struggling, encourage them.
+- Do not mention images or diagrams.`,
             },
             ...history,
           ],
@@ -200,6 +201,13 @@ STRICT RULES:
             <h1 className="text-xl font-bold tracking-tight">AI Tutor</h1>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate({ to: "/ai-call" })}
+              className="text-white/70 hover:text-white p-1 transition-colors"
+              aria-label="Voice Call"
+            >
+              <Phone className="h-5 w-5" strokeWidth={1.8} />
+            </button>
             <button onClick={() => alert("Coming soon!")} className="text-white/70 hover:text-white p-1 transition-colors"><History className="h-5 w-5" strokeWidth={1.8} /></button>
             <button onClick={startNewChat} className="text-white/70 hover:text-white p-1 transition-colors"><MessageSquarePlus className="h-5 w-5" strokeWidth={1.8} /></button>
           </div>
@@ -231,29 +239,7 @@ STRICT RULES:
                   </button>
                 ))}
               </div>
-              {/* Welcome screen input */}
-              <div className="w-full relative">
-                <span className="text-xs font-semibold uppercase tracking-[0.1em] text-white/35 block mb-3">Start a new chat</span>
-                {showAttachments && <AttachmentDropdown />}
-                {attachedFile?.previewUrl && (
-                  <div className="relative inline-block mb-2">
-                    <img src={attachedFile.previewUrl} alt="Preview" className="h-16 w-16 rounded-xl object-cover border border-white/10" />
-                    <button type="button" onClick={() => { URL.revokeObjectURL(attachedFile.previewUrl!); setAttachedFile(null); }} className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-black/80 border border-white/20 flex items-center justify-center hover:bg-black"><X className="h-2.5 w-2.5" /></button>
-                  </div>
-                )}
-                {attachedFile && !attachedFile.previewUrl && (
-                  <div className="flex items-center justify-between rounded-xl bg-indigo-500/10 border border-indigo-500/20 px-3 py-2 text-xs text-indigo-300 mb-2">
-                    <span className="flex items-center gap-2"><FileText className="h-3.5 w-3.5" />{attachedFile.type}: {attachedFile.name}</span>
-                    <button onClick={() => setAttachedFile(null)}><X className="h-3.5 w-3.5 text-white/40 hover:text-white" /></button>
-                  </div>
-                )}
-                <form onSubmit={handleSend} className="relative flex items-center gap-2 w-full rounded-2xl border border-white/10 bg-white/[0.02] pl-3 pr-2 py-1.5 focus-within:border-white/20">
-                  <button type="button" onClick={() => setShowAttachments(!showAttachments)} className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/[0.04] text-white/60 hover:text-white transition-colors"><Plus className="h-5 w-5" /></button>
-                  <textarea rows={1} placeholder="Ask anything..." value={inputVal} onChange={e => setInputVal(e.target.value)} className="flex-1 bg-transparent border-0 outline-none text-white text-sm placeholder:text-white/30 h-9 py-2 resize-none" onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(e); } }} />
-                  <button type="submit" disabled={(!inputVal.trim() && !attachedFile) || isLoading} className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-black disabled:opacity-40 hover:scale-105 active:scale-95 transition-transform flex-shrink-0"><Send className="h-3.5 w-3.5" strokeWidth={2.5} /></button>
-                </form>
-                <p className="text-[10px] text-white/20 text-center mt-3">AI can make mistakes. Check important info.</p>
-              </div>
+              {/* End of welcome prompts */}
             </div>
           ) : (
             <div className="space-y-5 pt-2">
@@ -282,35 +268,33 @@ STRICT RULES:
           )}
         </div>
 
-        {/* Fixed input bar — only in chat mode */}
-        {chatStarted && (
-          <div className="fixed bottom-0 left-0 right-0 z-50">
-            <div className="max-w-md mx-auto bg-[#111111]/95 backdrop-blur-md border-t border-white/5 px-4 pt-3 pb-6">
-              {showAttachments && (
-                <div className="relative">
-                  <AttachmentDropdown />
-                </div>
-              )}
-              {attachedFile?.previewUrl && (
-                <div className="relative inline-block mb-2">
-                  <img src={attachedFile.previewUrl} alt="Preview" className="h-16 w-16 rounded-xl object-cover border border-white/10" />
-                  <button type="button" onClick={() => { URL.revokeObjectURL(attachedFile.previewUrl!); setAttachedFile(null); }} className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-black/80 border border-white/20 flex items-center justify-center hover:bg-black"><X className="h-2.5 w-2.5" /></button>
-                </div>
-              )}
-              {attachedFile && !attachedFile.previewUrl && (
-                <div className="flex items-center justify-between rounded-xl bg-indigo-500/10 border border-indigo-500/20 px-3 py-1.5 text-[11px] text-indigo-300 mb-2">
-                  <span className="flex items-center gap-2"><FileText className="h-3.5 w-3.5" />{attachedFile.type}: {attachedFile.name}</span>
-                  <button onClick={() => setAttachedFile(null)}><X className="h-3.5 w-3.5 text-white/40 hover:text-white" /></button>
-                </div>
-              )}
-              <form onSubmit={handleSend} className="flex items-center gap-2 w-full rounded-xl border border-white/10 bg-white/[0.02] pl-3 pr-2 py-1.5 focus-within:border-white/20">
-                <button type="button" onClick={() => setShowAttachments(!showAttachments)} className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/[0.04] text-white/60 hover:text-white transition-colors flex-shrink-0"><Plus className="h-5 w-5" /></button>
-                <input type="text" placeholder="Ask anything..." value={inputVal} onChange={e => setInputVal(e.target.value)} disabled={isLoading} className="flex-1 bg-transparent border-0 outline-none text-white text-sm placeholder:text-white/30 h-9 py-2" />
-                <button type="submit" disabled={(!inputVal.trim() && !attachedFile) || isLoading} className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-black disabled:opacity-40 hover:scale-105 active:scale-95 transition-transform flex-shrink-0"><Send className="h-3.5 w-3.5" strokeWidth={2.5} /></button>
-              </form>
-            </div>
+        {/* Fixed input bar — always visible */}
+        <div className="fixed bottom-0 left-0 right-0 z-50">
+          <div className="max-w-md mx-auto bg-[#111111]/95 backdrop-blur-md border-t border-white/5 px-4 pt-3 pb-6">
+            {showAttachments && (
+              <div className="relative">
+                <AttachmentDropdown />
+              </div>
+            )}
+            {attachedFile?.previewUrl && (
+              <div className="relative inline-block mb-2">
+                <img src={attachedFile.previewUrl} alt="Preview" className="h-16 w-16 rounded-xl object-cover border border-white/10" />
+                <button type="button" onClick={() => { URL.revokeObjectURL(attachedFile.previewUrl!); setAttachedFile(null); }} className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-black/80 border border-white/20 flex items-center justify-center hover:bg-black"><X className="h-2.5 w-2.5" /></button>
+              </div>
+            )}
+            {attachedFile && !attachedFile.previewUrl && (
+              <div className="flex items-center justify-between rounded-xl bg-indigo-500/10 border border-indigo-500/20 px-3 py-1.5 text-[11px] text-indigo-300 mb-2">
+                <span className="flex items-center gap-2"><FileText className="h-3.5 w-3.5" />{attachedFile.type}: {attachedFile.name}</span>
+                <button onClick={() => setAttachedFile(null)}><X className="h-3.5 w-3.5 text-white/40 hover:text-white" /></button>
+              </div>
+            )}
+            <form onSubmit={handleSend} className="flex items-center gap-2 w-full rounded-xl border border-white/10 bg-white/[0.02] pl-3 pr-2 py-1.5 focus-within:border-white/20">
+              <button type="button" onClick={() => setShowAttachments(!showAttachments)} className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/[0.04] text-white/60 hover:text-white transition-colors flex-shrink-0"><Plus className="h-5 w-5" /></button>
+              <input type="text" placeholder="Ask anything..." value={inputVal} onChange={e => setInputVal(e.target.value)} disabled={isLoading} className="flex-1 bg-transparent border-0 outline-none text-white text-sm placeholder:text-white/30 h-9 py-2" />
+              <button type="submit" disabled={(!inputVal.trim() && !attachedFile) || isLoading} className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-black disabled:opacity-40 hover:scale-105 active:scale-95 transition-transform flex-shrink-0"><Send className="h-3.5 w-3.5" strokeWidth={2.5} /></button>
+            </form>
           </div>
-        )}
+        </div>
 
       </div>
     </div>
