@@ -3,7 +3,7 @@ services:
     name: the-flow
     env: node
     buildCommand: npm install && npm run build
-    startCommand: npm run preview -- --host 0.0.0.0 --port $PORT
+    startCommand: npm run preview -- --host 0.0.0.0 --port $PORT --allowed-hosts all
     envVars:
       - key: NODE_VERSION
         value: 20
