@@ -14,7 +14,7 @@ export default defineConfig({
   },
   vite: {
     preview: {
-      allowedHosts: ["all"],
+      allowedHosts: true,
     },
   },
 });
