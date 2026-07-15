@@ -1,5 +1,11 @@
-const CACHE_NAME = "the-flow-v1";
-const STATIC_ASSETS = ["/", "/manifest.json", "/icon-192.jpeg", "/icon-512.jpeg"];
+const CACHE_NAME = "the-flow-v2";
+const STATIC_ASSETS = [
+  "/",
+  "/manifest.json",
+  "/icon-192.jpeg",
+  "/icon-512.jpeg",
+  "/offline.html",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -18,6 +24,20 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
+  // Only handle GET requests
+  if (event.request.method !== "GET") return;
+
+  // For navigation requests (page loads), serve offline.html if fetch fails
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      fetch(event.request).catch(() =>
+        caches.match("/offline.html")
+      )
+    );
+    return;
+  }
+
+  // For other requests, try network first, fall back to cache
   event.respondWith(
     fetch(event.request).catch(() => caches.match(event.request))
   );
