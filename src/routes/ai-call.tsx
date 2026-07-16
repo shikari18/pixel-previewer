@@ -69,25 +69,49 @@ function getBestFallbackVoice(synth: SpeechSynthesis | null): SpeechSynthesisVoi
   return voices.find(v => v.lang.startsWith("en")) || null;
 }
 
-// Play base64 mp3 safely — returns cleanup fn
+// Play base64 mp3 safely via Web Audio API context decoding — bypasses iOS autoplay blocks
 function playBase64Audio(
+  ctx: AudioContext,
   base64: string,
   onEnded: () => void,
   onError: () => void
-): { audio: HTMLAudioElement; cleanup: () => void } {
-  // Decode base64 → Uint8Array → Blob → object URL (avoids iOS data: URL issues)
-  const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-  const blob = new Blob([bytes], { type: "audio/mpeg" });
-  const url = URL.createObjectURL(blob);
-  const audio = new Audio(url);
-  audio.onended = () => { URL.revokeObjectURL(url); onEnded(); };
-  audio.onerror = () => { URL.revokeObjectURL(url); onError(); };
-  audio.play().catch(onError);
+): { cleanup: () => void } {
+  let source: AudioBufferSourceNode | null = null;
+  let active = true;
+
+  try {
+    const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+    const bufferCopy = bytes.buffer.slice(0);
+
+    ctx.decodeAudioData(
+      bufferCopy,
+      (audioBuffer) => {
+        if (!active) return;
+        source = ctx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(ctx.destination);
+        source.onended = () => {
+          if (active) onEnded();
+        };
+        source.start(0);
+      },
+      () => {
+        if (active) onError();
+      }
+    );
+  } catch (err) {
+    console.error("Audio decode error:", err);
+    if (active) onError();
+  }
+
   return {
-    audio,
     cleanup: () => {
-      audio.pause();
-      URL.revokeObjectURL(url);
+      active = false;
+      if (source) {
+        try {
+          source.stop();
+        } catch (e) {}
+      }
     },
   };
 }
@@ -117,6 +141,19 @@ function AiCallPage() {
   const videoRef        = useRef<HTMLVideoElement | null>(null);
   const streamRef       = useRef<MediaStream | null>(null);
   const voiceIdRef      = useRef(voiceId);
+  const audioCtxRef     = useRef<AudioContext | null>(null);
+
+  // Lazy AudioContext initializer — safe for both SSR and client instantiation
+  const getAudioContext = useCallback(() => {
+    if (typeof window === "undefined") return null;
+    if (!audioCtxRef.current) {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioCtx) {
+        audioCtxRef.current = new AudioCtx();
+      }
+    }
+    return audioCtxRef.current;
+  }, []);
 
   // Initialize browser-only refs once on client
   useEffect(() => {
@@ -131,28 +168,27 @@ function AiCallPage() {
   // ─── Ringing oscillator ──────────────────────────────────────────────────
   function startRingingAudio() {
     try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioCtx) return null;
-      const ctx = new AudioCtx();
+      const ctx = getAudioContext();
+      if (!ctx) return null;
       const playBurst = () => {
-        if (ctx.state === "suspended") ctx.resume();
+        if (ctx.state === "suspended") ctx.resume().catch(() => {});
         [440, 480].forEach(freq => {
           const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
+          const gridGain = ctx.createGain();
           osc.frequency.value = freq;
-          gain.gain.setValueAtTime(0, ctx.currentTime);
-          gain.gain.linearRampToValueAtTime(0.07, ctx.currentTime + 0.12);
-          gain.gain.setValueAtTime(0.07, ctx.currentTime + 1.5);
-          gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.7);
-          osc.connect(gain);
-          gain.connect(ctx.destination);
+          gridGain.gain.setValueAtTime(0, ctx.currentTime);
+          gridGain.gain.linearRampToValueAtTime(0.07, ctx.currentTime + 0.12);
+          gridGain.gain.setValueAtTime(0.07, ctx.currentTime + 1.5);
+          gridGain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.7);
+          osc.connect(gridGain);
+          gridGain.connect(ctx.destination);
           osc.start();
           osc.stop(ctx.currentTime + 1.7);
         });
       };
       playBurst();
       const iv = setInterval(playBurst, 2500);
-      return { stop: () => { clearInterval(iv); ctx.close().catch(() => {}); } };
+      return { stop: () => { clearInterval(iv); } };
     } catch { return null; }
   }
 
@@ -216,17 +252,26 @@ function AiCallPage() {
 
     try {
       const base64 = await generateSpeech({ data: text, voiceId: overrideVoiceId ?? voiceIdRef.current });
-      const { cleanup } = playBase64Audio(
-        base64,
-        () => { clearTimeout(safety); done(); },
-        () => { clearTimeout(safety); fallbackSpeak(text, done); }
-      );
-      audioCleanupRef.current = cleanup;
+      const ctx = getAudioContext();
+      if (ctx) {
+        if (ctx.state === "suspended") {
+          await ctx.resume().catch(() => {});
+        }
+        const { cleanup } = playBase64Audio(
+          ctx,
+          base64,
+          () => { clearTimeout(safety); done(); },
+          () => { clearTimeout(safety); fallbackSpeak(text, done); }
+        );
+        audioCleanupRef.current = cleanup;
+      } else {
+        throw new Error("AudioContext unsupported");
+      }
     } catch {
       clearTimeout(safety);
       fallbackSpeak(text, done);
     }
-  }, [fallbackSpeak]);
+  }, [fallbackSpeak, getAudioContext]);
 
   // ─── Speech Recognition ─────────────────────────────────────────────────
   const startListening = useCallback(() => {
@@ -322,6 +367,17 @@ function AiCallPage() {
 
   // ─── Mount: ring for 5 s while pre-warming greeting audio ───────────────
   useEffect(() => {
+    const unlock = () => {
+      const ctx = getAudioContext();
+      if (ctx && ctx.state === "suspended") {
+        ctx.resume().catch(() => {});
+      }
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("click", unlock);
+      window.addEventListener("touchstart", unlock);
+    }
+
     const ringing = startRingingAudio();
     ringingRef.current = ringing;
 
@@ -347,8 +403,10 @@ function AiCallPage() {
       const safety = setTimeout(done, Math.max(5000, wordCount * 600 + 4000));
 
       const play = () => {
-        if (greetingBase64) {
+        const ctx = getAudioContext();
+        if (greetingBase64 && ctx) {
           const { cleanup } = playBase64Audio(
+            ctx,
             greetingBase64,
             () => { clearTimeout(safety); done(); },
             () => { clearTimeout(safety); fallbackSpeak(GREETING, done); }
@@ -364,6 +422,10 @@ function AiCallPage() {
     }, 5000);
 
     return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("click", unlock);
+        window.removeEventListener("touchstart", unlock);
+      }
       clearTimeout(connectTimer);
       ringingRef.current?.stop();
       streamRef.current?.getTracks().forEach(t => t.stop());

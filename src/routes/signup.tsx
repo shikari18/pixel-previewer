@@ -19,7 +19,9 @@ function SignUp() {
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    navigate({ to: "/onboarding/$step", params: { step: "1" } });
+    const search = typeof window !== "undefined" ? window.location.search : "";
+    const plan = search.includes("plan=plus") ? "plus" : "premium";
+    navigate({ to: "/pricing", search: { signup: "success", plan } as any });
   };
 
   return (

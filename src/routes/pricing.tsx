@@ -22,7 +22,24 @@ function AiTutorIcon({ className = "h-5 w-5" }: { className?: string }) {
 
 function Pricing() {
   const navigate = useNavigate();
-  const [selectedPlan, setSelectedPlan] = useState<string | null>("premium");
+  
+  const search = typeof window !== "undefined" ? window.location.search : "";
+  const isSignupSuccess = search.includes("signup=success");
+  const initialPlan = search.includes("plan=plus") ? "plus" : "premium";
+  
+  const [selectedPlan, setSelectedPlan] = useState<string | null>(initialPlan);
+  const [activating, setActivating] = useState(false);
+
+  const handlePlanChoose = (plan: string) => {
+    if (isSignupSuccess) {
+      setActivating(true);
+      setTimeout(() => {
+        navigate({ to: "/onboarding/$step", params: { step: "1" } });
+      }, 1800);
+    } else {
+      navigate({ to: "/signup", search: { plan } as any });
+    }
+  };
 
   const plusFeatures = [
     { text: "Distraction-Free Study Space", included: true },
@@ -78,15 +95,17 @@ function Pricing() {
           >
             <ArrowLeft className="h-6 w-6" strokeWidth={1.8} />
           </button>
-          <h1 className="text-xl font-bold tracking-tight">Membership</h1>
+          <h1 className="text-xl font-bold tracking-tight">{isSignupSuccess ? "Activate Membership" : "Membership"}</h1>
         </header>
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto px-6 pb-28 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] space-y-6">
           
           <div className="text-center mt-2">
-            <h2 className="text-3xl font-extrabold tracking-tight">Pricing Plans</h2>
-            <p className="text-sm text-white/50 mt-2 max-w-sm mx-auto">Simple, transparent options to fuel your learning state.</p>
+            <h2 className="text-3xl font-extrabold tracking-tight">{isSignupSuccess ? "Confirm Your Plan" : "Pricing Plans"}</h2>
+            <p className="text-sm text-white/50 mt-2 max-w-sm mx-auto">
+              {isSignupSuccess ? "Welcome to The Flow! Confirm your choice to unlock your space." : "Simple, transparent options to fuel your learning state."}
+            </p>
           </div>
 
           {/* Plan Cards Container */}
@@ -121,7 +140,7 @@ function Pricing() {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  alert("Subscription: Transitioning to Flow Plus...");
+                  handlePlanChoose("plus");
                 }}
                 className={`w-full py-3.5 rounded-xl font-bold text-sm transition-all active:scale-[0.98] ${
                   selectedPlan === "plus"
@@ -129,7 +148,7 @@ function Pricing() {
                     : "bg-white/10 text-white hover:bg-white/15"
                 }`}
               >
-                Choose Flow Plus
+                {isSignupSuccess ? "Confirm & Activate Plus" : "Choose Flow Plus"}
               </button>
 
               <hr className="my-5 border-white/10" />
@@ -190,7 +209,7 @@ function Pricing() {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  alert("Subscription: Transitioning to Flow Premium...");
+                  handlePlanChoose("premium");
                 }}
                 className={`w-full py-3.5 rounded-xl font-bold text-sm transition-all active:scale-[0.98] ${
                   selectedPlan === "premium"
@@ -198,7 +217,7 @@ function Pricing() {
                     : "bg-white/10 text-white hover:bg-white/15"
                 }`}
               >
-                Choose Flow Premium
+                {isSignupSuccess ? "Confirm & Activate Premium" : "Choose Flow Premium"}
               </button>
 
               <hr className="my-5 border-white/10" />
@@ -239,6 +258,13 @@ function Pricing() {
           ))}
         </div>
 
+        {activating && (
+          <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex flex-col items-center justify-center gap-4 animate-in fade-in duration-300">
+            <div className="w-12 h-12 rounded-full border-[3px] border-indigo-500 border-t-transparent animate-spin" />
+            <h3 className="text-lg font-bold text-white mt-2">Activating Flow Space...</h3>
+            <p className="text-xs text-white/40">Preparing your personalized environment</p>
+          </div>
+        )}
       </div>
     </div>
   );
