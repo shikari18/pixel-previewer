@@ -134,7 +134,8 @@ RULES:
 - Always include a "### Common Pitfalls" section for topic explanations.
 - Format with ### headers and - bullet lists.
 - Be conversational and supportive — if a student is struggling, encourage them.
-- Do not mention images or diagrams.`,
+- Do not mention images or diagrams.
+- CRITICAL: If the user asks you to SUMMARIZE, make a summary, write a note, or condense something, keep it extremely concise, brief, and to the point. Do NOT include common pitfalls or a long breakdown for summary requests unless explicitly asked.`,
             },
             ...history,
           ],
@@ -288,10 +289,10 @@ RULES:
                 <button onClick={() => setAttachedFile(null)}><X className="h-3.5 w-3.5 text-white/40 hover:text-white" /></button>
               </div>
             )}
-            <form onSubmit={handleSend} className="flex items-center gap-2 w-full rounded-xl border border-white/10 bg-white/[0.02] pl-3 pr-2 py-1.5 focus-within:border-white/20">
-              <button type="button" onClick={() => setShowAttachments(!showAttachments)} className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/[0.04] text-white/60 hover:text-white transition-colors flex-shrink-0"><Plus className="h-5 w-5" /></button>
-              <input type="text" placeholder="Ask anything..." value={inputVal} onChange={e => setInputVal(e.target.value)} disabled={isLoading} className="flex-1 bg-transparent border-0 outline-none text-white text-sm placeholder:text-white/30 h-9 py-2" />
-              <button type="submit" disabled={(!inputVal.trim() && !attachedFile) || isLoading} className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-black disabled:opacity-40 hover:scale-105 active:scale-95 transition-transform flex-shrink-0"><Send className="h-3.5 w-3.5" strokeWidth={2.5} /></button>
+            <form onSubmit={handleSend} className="flex items-center gap-3 w-full rounded-full border border-white/10 bg-white/[0.03] pl-2 pr-2 py-1.5 focus-within:border-indigo-500/50 focus-within:ring-1 focus-within:ring-indigo-500/30 transition-all duration-300 shadow-[inset_0_1px_2px_rgba(255,255,255,0.05)]">
+              <button type="button" onClick={() => setShowAttachments(!showAttachments)} className="flex h-9 w-9 items-center justify-center rounded-full bg-white/[0.04] text-white/60 hover:text-white hover:bg-white/[0.08] active:scale-95 transition-all flex-shrink-0"><Plus className="h-5 w-5" /></button>
+              <input type="text" placeholder="Ask anything..." value={inputVal} onChange={e => setInputVal(e.target.value)} disabled={isLoading} className="flex-1 bg-transparent border-0 outline-none text-white text-sm placeholder:text-white/30 h-9 py-1 px-1 focus:ring-0" />
+              <button type="submit" disabled={(!inputVal.trim() && !attachedFile) || isLoading} className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-600 text-white disabled:bg-white/10 disabled:text-white/30 hover:bg-indigo-500 hover:scale-105 active:scale-95 transition-all flex-shrink-0 shadow-md"><Send className="h-4 w-4" strokeWidth={2.2} /></button>
             </form>
           </div>
         </div>

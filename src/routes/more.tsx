@@ -44,7 +44,7 @@ const menuItems = [
   },
   {
     label: "Study Goals",
-    to: "/home",
+    to: "/study-goals",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
         <circle cx="12" cy="12" r="10" />
@@ -55,7 +55,7 @@ const menuItems = [
   },
   {
     label: "Focus Timer",
-    to: "/home",
+    to: "/focus-timer",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
         <circle cx="12" cy="12" r="9" />
@@ -65,7 +65,7 @@ const menuItems = [
   },
   {
     label: "Settings",
-    to: "/home",
+    to: "/settings",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
         <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" />

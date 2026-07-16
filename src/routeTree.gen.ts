@@ -9,13 +9,16 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as StudyGoalsRouteImport } from './routes/study-goals'
 import { Route as StreaksRouteImport } from './routes/streaks'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SigninRouteImport } from './routes/signin'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as MoreRouteImport } from './routes/more'
 import { Route as LibraryRouteImport } from './routes/library'
 import { Route as HomeRouteImport } from './routes/home'
+import { Route as FocusTimerRouteImport } from './routes/focus-timer'
 import { Route as CustomerServiceRouteImport } from './routes/customer-service'
 import { Route as CustomerChatRouteImport } from './routes/customer-chat'
 import { Route as CollabRouteImport } from './routes/collab'
@@ -27,6 +30,11 @@ import { Route as AboutUsRouteImport } from './routes/about-us'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as OnboardingStepRouteImport } from './routes/onboarding.$step'
 
+const StudyGoalsRoute = StudyGoalsRouteImport.update({
+  id: '/study-goals',
+  path: '/study-goals',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StreaksRoute = StreaksRouteImport.update({
   id: '/streaks',
   path: '/streaks',
@@ -40,6 +48,11 @@ const SignupRoute = SignupRouteImport.update({
 const SigninRoute = SigninRouteImport.update({
   id: '/signin',
   path: '/signin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PricingRoute = PricingRouteImport.update({
@@ -60,6 +73,11 @@ const LibraryRoute = LibraryRouteImport.update({
 const HomeRoute = HomeRouteImport.update({
   id: '/home',
   path: '/home',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FocusTimerRoute = FocusTimerRouteImport.update({
+  id: '/focus-timer',
+  path: '/focus-timer',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CustomerServiceRoute = CustomerServiceRouteImport.update({
@@ -123,13 +141,16 @@ export interface FileRoutesByFullPath {
   '/collab': typeof CollabRoute
   '/customer-chat': typeof CustomerChatRoute
   '/customer-service': typeof CustomerServiceRoute
+  '/focus-timer': typeof FocusTimerRoute
   '/home': typeof HomeRoute
   '/library': typeof LibraryRoute
   '/more': typeof MoreRoute
   '/pricing': typeof PricingRoute
+  '/settings': typeof SettingsRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
   '/streaks': typeof StreaksRoute
+  '/study-goals': typeof StudyGoalsRoute
   '/onboarding/$step': typeof OnboardingStepRoute
 }
 export interface FileRoutesByTo {
@@ -142,13 +163,16 @@ export interface FileRoutesByTo {
   '/collab': typeof CollabRoute
   '/customer-chat': typeof CustomerChatRoute
   '/customer-service': typeof CustomerServiceRoute
+  '/focus-timer': typeof FocusTimerRoute
   '/home': typeof HomeRoute
   '/library': typeof LibraryRoute
   '/more': typeof MoreRoute
   '/pricing': typeof PricingRoute
+  '/settings': typeof SettingsRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
   '/streaks': typeof StreaksRoute
+  '/study-goals': typeof StudyGoalsRoute
   '/onboarding/$step': typeof OnboardingStepRoute
 }
 export interface FileRoutesById {
@@ -162,13 +186,16 @@ export interface FileRoutesById {
   '/collab': typeof CollabRoute
   '/customer-chat': typeof CustomerChatRoute
   '/customer-service': typeof CustomerServiceRoute
+  '/focus-timer': typeof FocusTimerRoute
   '/home': typeof HomeRoute
   '/library': typeof LibraryRoute
   '/more': typeof MoreRoute
   '/pricing': typeof PricingRoute
+  '/settings': typeof SettingsRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
   '/streaks': typeof StreaksRoute
+  '/study-goals': typeof StudyGoalsRoute
   '/onboarding/$step': typeof OnboardingStepRoute
 }
 export interface FileRouteTypes {
@@ -183,13 +210,16 @@ export interface FileRouteTypes {
     | '/collab'
     | '/customer-chat'
     | '/customer-service'
+    | '/focus-timer'
     | '/home'
     | '/library'
     | '/more'
     | '/pricing'
+    | '/settings'
     | '/signin'
     | '/signup'
     | '/streaks'
+    | '/study-goals'
     | '/onboarding/$step'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -202,13 +232,16 @@ export interface FileRouteTypes {
     | '/collab'
     | '/customer-chat'
     | '/customer-service'
+    | '/focus-timer'
     | '/home'
     | '/library'
     | '/more'
     | '/pricing'
+    | '/settings'
     | '/signin'
     | '/signup'
     | '/streaks'
+    | '/study-goals'
     | '/onboarding/$step'
   id:
     | '__root__'
@@ -221,13 +254,16 @@ export interface FileRouteTypes {
     | '/collab'
     | '/customer-chat'
     | '/customer-service'
+    | '/focus-timer'
     | '/home'
     | '/library'
     | '/more'
     | '/pricing'
+    | '/settings'
     | '/signin'
     | '/signup'
     | '/streaks'
+    | '/study-goals'
     | '/onboarding/$step'
   fileRoutesById: FileRoutesById
 }
@@ -241,18 +277,28 @@ export interface RootRouteChildren {
   CollabRoute: typeof CollabRoute
   CustomerChatRoute: typeof CustomerChatRoute
   CustomerServiceRoute: typeof CustomerServiceRoute
+  FocusTimerRoute: typeof FocusTimerRoute
   HomeRoute: typeof HomeRoute
   LibraryRoute: typeof LibraryRoute
   MoreRoute: typeof MoreRoute
   PricingRoute: typeof PricingRoute
+  SettingsRoute: typeof SettingsRoute
   SigninRoute: typeof SigninRoute
   SignupRoute: typeof SignupRoute
   StreaksRoute: typeof StreaksRoute
+  StudyGoalsRoute: typeof StudyGoalsRoute
   OnboardingStepRoute: typeof OnboardingStepRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/study-goals': {
+      id: '/study-goals'
+      path: '/study-goals'
+      fullPath: '/study-goals'
+      preLoaderRoute: typeof StudyGoalsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/streaks': {
       id: '/streaks'
       path: '/streaks'
@@ -272,6 +318,13 @@ declare module '@tanstack/react-router' {
       path: '/signin'
       fullPath: '/signin'
       preLoaderRoute: typeof SigninRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pricing': {
@@ -300,6 +353,13 @@ declare module '@tanstack/react-router' {
       path: '/home'
       fullPath: '/home'
       preLoaderRoute: typeof HomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/focus-timer': {
+      id: '/focus-timer'
+      path: '/focus-timer'
+      fullPath: '/focus-timer'
+      preLoaderRoute: typeof FocusTimerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/customer-service': {
@@ -385,13 +445,16 @@ const rootRouteChildren: RootRouteChildren = {
   CollabRoute: CollabRoute,
   CustomerChatRoute: CustomerChatRoute,
   CustomerServiceRoute: CustomerServiceRoute,
+  FocusTimerRoute: FocusTimerRoute,
   HomeRoute: HomeRoute,
   LibraryRoute: LibraryRoute,
   MoreRoute: MoreRoute,
   PricingRoute: PricingRoute,
+  SettingsRoute: SettingsRoute,
   SigninRoute: SigninRoute,
   SignupRoute: SignupRoute,
   StreaksRoute: StreaksRoute,
+  StudyGoalsRoute: StudyGoalsRoute,
   OnboardingStepRoute: OnboardingStepRoute,
 }
 export const routeTree = rootRouteImport
