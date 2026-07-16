@@ -122,6 +122,16 @@ function VrClassroomPage() {
   const [segCount, setSegCount] = useState(0);
   const [history, setHistory] = useState<{role:string;content:string}[]>([]);
   const [handRaised, setHandRaised] = useState(false);
+  // -- Gyroscope look-around
+  const [gyroEnabled, setGyroEnabled] = useState(false);
+  const [gyroPermission, setGyroPermission] = useState("unknown");
+  const [gyroHint, setGyroHint] = useState(false);
+  const [worldX, setWorldX] = useState(0);
+  const [worldY, setWorldY] = useState(0);
+  const targetRef   = useRef({ gamma: 0, beta: 0 });
+  const baselineRef = useRef(null);
+  const smoothRef   = useRef({ x: 0, y: 0 });
+  const rafRef      = useRef(null);
 
   const audioCtxRef    = useRef<AudioContext|null>(null);
   const cleanupRef     = useRef<(()=>void)|null>(null);
@@ -146,6 +156,41 @@ function VrClassroomPage() {
 
   const timeLeft = durationMin * 60 - elapsed;
 
+
+  const enableGyro = async () => {
+    if (typeof window === "undefined") return;
+    const DE = (window as any).DeviceOrientationEvent;
+    if (typeof DE?.requestPermission === "function") {
+      try {
+        const r = await DE.requestPermission();
+        if (r === "granted") { setGyroPermission("granted"); setGyroEnabled(true); }
+        else setGyroPermission("denied");
+      } catch { setGyroPermission("denied"); }
+    } else { setGyroPermission("granted"); setGyroEnabled(true); }
+  };
+
+  useEffect(() => {
+    if (!gyroEnabled || typeof window === "undefined") return;
+    baselineRef.current = null;
+    const onOri = (e: DeviceOrientationEvent) => {
+      const g = e.gamma ?? 0; const b = e.beta ?? 0;
+      if (!baselineRef.current) baselineRef.current = { gamma: g, beta: b };
+      targetRef.current = { gamma: g - (baselineRef.current as any).gamma, beta: b - (baselineRef.current as any).beta };
+    };
+    window.addEventListener("deviceorientation", onOri, true);
+    setGyroHint(true); const ht = setTimeout(() => setGyroHint(false), 3200);
+    const LERP = 0.07, MX = 90, MY = 45;
+    const loop = () => {
+      const tX = Math.max(-MX, Math.min(MX, targetRef.current.gamma * 1.5));
+      const tY = Math.max(-MY, Math.min(MY, targetRef.current.beta  * 0.7));
+      smoothRef.current.x += (tX - smoothRef.current.x) * LERP;
+      smoothRef.current.y += (tY - smoothRef.current.y) * LERP;
+      setWorldX(smoothRef.current.x); setWorldY(smoothRef.current.y);
+      rafRef.current = requestAnimationFrame(loop);
+    };
+    rafRef.current = requestAnimationFrame(loop);
+    return () => { window.removeEventListener("deviceorientation", onOri, true); if (rafRef.current) cancelAnimationFrame(rafRef.current); clearTimeout(ht); };
+  }, [gyroEnabled]);
   const speak = useCallback(async (text: string, onDone: () => void) => {
     cleanupRef.current?.();
     const ctx = getCtx();
@@ -210,6 +255,7 @@ function VrClassroomPage() {
     setElapsed(0); setSegCount(0); setHistory([]); setCurrentText("");
     sessionOn.current = true;
     setPhase("session");
+    if ((gyroPermission as string) !== "denied") { setTimeout(() => { setGyroEnabled(true); }, 600); }
   }, [selectedSubject, selectedTopic, getCtx]);
 
   useEffect(() => {
@@ -232,6 +278,7 @@ function VrClassroomPage() {
     sessionOn.current = false;
     cleanupRef.current?.();
     if (timerRef.current) clearInterval(timerRef.current);
+    if (rafRef.current) cancelAnimationFrame(rafRef.current as number);
     if (typeof window !== "undefined") window.speechSynthesis?.cancel();
   }, []);
 
@@ -364,6 +411,10 @@ function VrClassroomPage() {
             <div className="h-1.5 w-1.5 bg-red-400 rounded-full animate-pulse"/>
             <span className="text-[9px] font-bold text-red-300 uppercase tracking-widest">Live</span>
           </div>
+          <button onClick={enableGyro} title={gyroEnabled?"Gyro ON":"Enable look-around"} className={`flex items-center gap-1 rounded-full px-2.5 py-1 border text-[9px] font-bold uppercase tracking-wide transition-all ${gyroEnabled?"bg-indigo-500/20 border-indigo-500/40 text-indigo-300":"bg-white/8 border-white/15 text-white/40"}`}>
+            <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+            {gyroEnabled?"VR On":"VR"}
+          </button>
         </div>
         <div className="text-center">
           <div className="text-xs font-bold text-white/90">{selectedSubject?.label} · {selectedTopic}</div>
@@ -375,8 +426,8 @@ function VrClassroomPage() {
         </div>
       </div>
 
-      {/* Chalkboard */}
-      <div className="absolute inset-0 flex items-center justify-center" style={{paddingTop:"108px",paddingBottom:"168px"}}>
+      {/* Chalkboard - moves with gyro */}
+      <div className="absolute inset-0 flex items-center justify-center" style={{paddingTop:"108px",paddingBottom:"168px",transform:`translate(${-worldX*0.85}px,${-worldY*0.55}px)`,willChange:"transform",transition:"transform 0.04s linear"}}>
         <div className="w-full mx-4 rounded-3xl overflow-hidden relative" style={{background:"linear-gradient(145deg,#0f1f12 0%,#0a1610 60%,#08120d 100%)",border:"1.5px solid rgba(255,255,255,0.05)",boxShadow:"0 0 80px rgba(0,0,0,0.9),inset 0 0 60px rgba(0,0,0,0.6)",minHeight:"220px"}}>
           <div className="absolute inset-0 opacity-[0.025] pointer-events-none" style={{backgroundImage:"radial-gradient(circle, white 1px, transparent 1px)",backgroundSize:"16px 16px"}}/>
           <div className="relative p-6 pt-5">
@@ -403,9 +454,16 @@ function VrClassroomPage() {
         </div>
       </div>
 
+      {gyroHint && (
+        <div className="absolute top-24 left-1/2 z-50 flex items-center gap-2 bg-black/80 backdrop-blur-md border border-indigo-500/30 rounded-full px-4 py-2 animate-in fade-in duration-300" style={{transform:"translateX(-50%)"}}>
+          <svg className="h-4 w-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+          <span className="text-xs text-white/80 font-medium">Swing phone to look around</span>
+        </div>
+      )}
+
       {/* Participants */}
       {showPeople && (
-        <div className="absolute left-2 top-28 z-30 w-40 rounded-2xl overflow-hidden" style={{background:"rgba(8,10,22,0.88)",backdropFilter:"blur(24px)",border:"1px solid rgba(255,255,255,0.06)"}}>
+        <div className="absolute left-2 top-28 z-30 w-40 rounded-2xl overflow-hidden" style={{background:"rgba(8,10,22,0.88)",backdropFilter:"blur(24px)",border:"1px solid rgba(255,255,255,0.06)",transform:`translate(${worldX*0.2}px,${worldY*0.15}px)`,willChange:"transform"}}>
           <div className="flex items-center justify-between px-3 py-2.5 border-b border-white/[0.05]">
             <span className="text-[9px] font-bold text-white/50 uppercase tracking-wider">Participants</span>
             <button onClick={() => setShowPeople(false)} className="text-white/25 hover:text-white/50">
@@ -430,7 +488,7 @@ function VrClassroomPage() {
 
       {/* Chat */}
       {showChat && (
-        <div className="absolute right-2 top-28 z-30 w-44 rounded-2xl overflow-hidden flex flex-col" style={{background:"rgba(8,10,22,0.88)",backdropFilter:"blur(24px)",border:"1px solid rgba(255,255,255,0.06)",maxHeight:"320px"}}>
+        <div className="absolute right-2 top-28 z-30 w-44 rounded-2xl overflow-hidden flex flex-col" style={{background:"rgba(8,10,22,0.88)",backdropFilter:"blur(24px)",border:"1px solid rgba(255,255,255,0.06)",maxHeight:"320px",transform:`translate(${-worldX*0.2}px,${worldY*0.15}px)`,willChange:"transform"}}>
           <div className="flex items-center justify-between px-3 py-2.5 border-b border-white/[0.05] flex-shrink-0">
             <span className="text-[9px] font-bold text-white/50 uppercase tracking-wider">Live Chat</span>
             <button onClick={() => setShowChat(false)} className="text-white/25 hover:text-white/50">
