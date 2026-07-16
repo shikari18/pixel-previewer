@@ -1,19 +1,44 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import { Mic, MicOff, Video, PhoneOff } from "lucide-react";
+import { Mic, MicOff, Video, PhoneOff, Sliders, X, Check, Volume2 } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import aiSphereImg from "@/assets/my-ai.png";
 
-export const generateSpeechFn = createServerFn("POST", async ({ data }: { data: string }) => {
+export const generateSpeechFn = createServerFn("POST", async ({ data, voiceId }: { data: string; voiceId: string }) => {
   try {
-    const { EdgeTTS } = await import("edge-tts-universal");
-    const tts = new EdgeTTS(data, "en-US-BrianNeural");
-    const result = await tts.synthesize();
-    const arrayBuf = await result.audio.arrayBuffer();
-    const audioBuffer = Buffer.from(arrayBuf);
-    return audioBuffer.toString("base64");
+    const apiKey = "sk_car_GW1Vfb53x362GSeYoEKV4f";
+    const response = await fetch("https://api.cartesia.ai/tts/bytes", {
+      method: "POST",
+      headers: {
+        "Cartesia-Version": "2024-06-10",
+        "X-API-Key": apiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model_id: "sonic-3.5",
+        transcript: data,
+        voice: {
+          mode: "id",
+          id: voiceId,
+        },
+        output_format: {
+          container: "mp3",
+          bit_rate: 128000,
+          sample_rate: 44100,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Cartesia API failed: ${response.statusText} - ${errorText}`);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const base64 = Buffer.from(arrayBuffer).toString("base64");
+    return base64;
   } catch (err) {
-    console.error("Error in TTS server function:", err);
+    console.error("Error in Cartesia TTS server function:", err);
     throw err;
   }
 });
@@ -59,6 +84,8 @@ function AiCallPage() {
   const [aiText, setAiText] = useState("Hi! I'm Mr. Simon. What would you like to study today?");
   const [status, setStatus] = useState<"greeting" | "listening" | "thinking" | "speaking" | "idle">("greeting");
   const [micError, setMicError] = useState<string | null>(null);
+  const [selectedVoiceId, setSelectedVoiceId] = useState<string>("db6b0ed5-d5d3-463d-ae85-518a07d3c2b4");
+  const [voicePanelOpen, setVoicePanelOpen] = useState(false);
 
   const synthRef = useRef(window.speechSynthesis);
   const recognitionRef = useRef<any>(null);
@@ -154,7 +181,7 @@ function AiCallPage() {
     }, safetyTimeoutMs);
 
     try {
-      const base64 = await generateSpeechFn({ data: text });
+      const base64 = await generateSpeechFn({ data: text, voiceId: selectedVoiceId });
       const audio = new Audio("data:audio/mp3;base64," + base64);
       activeAudioRef.current = audio;
       
@@ -175,7 +202,7 @@ function AiCallPage() {
       console.warn("generateSpeechFn failed, falling back to Web Speech API:", e);
       fallbackSpeak(text, triggerDone);
     }
-  }, [fallbackSpeak]);
+  }, [fallbackSpeak, selectedVoiceId]);
 
   const startListening = useCallback(() => {
     if (mutedRef.current || listeningRef.current || micError) return;
@@ -320,6 +347,15 @@ function AiCallPage() {
     <div className="fixed inset-0 bg-black text-white flex overflow-hidden">
       <div className="relative w-full h-full flex flex-col items-center justify-between py-16 px-8">
 
+        {/* Top-Right Voice Selector Toggle */}
+        <button
+          onClick={() => setVoicePanelOpen(true)}
+          className="absolute top-6 right-6 z-40 h-10 w-10 rounded-full bg-white/[0.05] border border-white/10 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 active:scale-95 transition-all"
+          aria-label="Select voice"
+        >
+          <Sliders className="h-5 w-5" />
+        </button>
+
         {/* Top: call info */}
         <div className="text-center space-y-1">
           <p className="text-xs text-white/40 font-medium tracking-widest uppercase">AI Tutor · Voice Call</p>
@@ -406,6 +442,103 @@ function AiCallPage() {
           </button>
 
         </div>
+
+        {/* Slide-out Voice Select Panel */}
+        {voicePanelOpen && (
+          <div className="absolute top-0 right-0 z-50 h-full w-72 bg-black/95 border-l border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.8)] flex flex-col p-6 animate-in slide-in-from-right duration-250">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-6">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <Volume2 className="h-5 w-5 text-indigo-400" />
+                Select Voice
+              </h3>
+              <button
+                onClick={() => setVoicePanelOpen(false)}
+                className="text-white/40 hover:text-white p-1 transition-colors"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* List of Voices */}
+            <div className="flex-1 overflow-y-auto space-y-6 pr-1 select-none [&::-webkit-scrollbar]:hidden">
+              
+              {/* Female Voices Section */}
+              <div>
+                <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-3">Realistic Female Voices</p>
+                <div className="space-y-2.5">
+                  {[
+                    { id: "db6b0ed5-d5d3-463d-ae85-518a07d3c2b4", name: "Skylar", desc: "Warm & conversational" },
+                    { id: "f786b574-daa5-4673-aa0c-cbe3e8534c02", name: "Katie", desc: "Expressive & clear" }
+                  ].map((v) => (
+                    <button
+                      key={v.id}
+                      onClick={() => {
+                        setSelectedVoiceId(v.id);
+                        setVoicePanelOpen(false);
+                      }}
+                      className={`w-full p-3.5 rounded-xl border text-left flex items-center justify-between transition-all ${
+                        selectedVoiceId === v.id
+                          ? "bg-indigo-600/10 border-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.1)]"
+                          : "bg-white/[0.02] border-white/5 text-white/60 hover:bg-white/[0.04] hover:text-white"
+                      }`}
+                    >
+                      <div>
+                        <p className="text-sm font-bold">{v.name}</p>
+                        <p className="text-[10px] text-white/40 mt-0.5">{v.desc}</p>
+                      </div>
+                      {selectedVoiceId === v.id && (
+                        <Check className="h-4.5 w-4.5 text-indigo-400 flex-shrink-0" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Male Voices Section */}
+              <div>
+                <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-3">Realistic Male Voices</p>
+                <div className="space-y-2.5">
+                  {[
+                    { id: "a5136bf9-224c-4d76-b823-52bd5efcffcc", name: "Jameson", desc: "Deep & natural" },
+                    { id: "ef191366-f52f-447a-a398-ed8c0f2943a1", name: "Archie", desc: "Friendly & professional" }
+                  ].map((v) => (
+                    <button
+                      key={v.id}
+                      onClick={() => {
+                        setSelectedVoiceId(v.id);
+                        setVoicePanelOpen(false);
+                      }}
+                      className={`w-full p-3.5 rounded-xl border text-left flex items-center justify-between transition-all ${
+                        selectedVoiceId === v.id
+                          ? "bg-indigo-600/10 border-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.1)]"
+                          : "bg-white/[0.02] border-white/5 text-white/60 hover:bg-white/[0.04] hover:text-white"
+                      }`}
+                    >
+                      <div>
+                        <p className="text-sm font-bold">{v.name}</p>
+                        <p className="text-[10px] text-white/40 mt-0.5">{v.desc}</p>
+                      </div>
+                      {selectedVoiceId === v.id && (
+                        <Check className="h-4.5 w-4.5 text-indigo-400 flex-shrink-0" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+
+            {/* Footer feedback */}
+            <div className="pt-4 border-t border-white/10 text-center">
+              <p className="text-[9px] text-white/30 font-medium">Select a voice to apply it to the next response.</p>
+            </div>
+
+          </div>
+        )}
+
       </div>
     </div>
   );
