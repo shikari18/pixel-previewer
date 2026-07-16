@@ -1,8 +1,44 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { Mic, MicOff, Video, PhoneOff, Sliders } from "lucide-react";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, Component, ReactNode } from "react";
 import aiSphereImg from "@/assets/my-ai.png";
+
+class LocalErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  state = { hasError: false, error: null as Error | null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: any) {
+    console.error("LocalErrorBoundary caught an error", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="fixed inset-0 bg-zinc-950 text-red-400 p-6 overflow-auto font-mono text-xs flex flex-col gap-4 z-50">
+          <h2 className="text-lg font-bold text-red-500">Render Error Caught</h2>
+          <p className="font-semibold">{this.state.error?.message}</p>
+          <pre className="bg-zinc-900 p-4 rounded border border-red-500/20 whitespace-pre-wrap overflow-auto max-h-[300px]">
+            {this.state.error?.stack}
+          </pre>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 px-4 py-2 bg-zinc-800 text-white rounded font-bold hover:bg-zinc-700 w-fit"
+          >
+            Reload Page
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const VOICES = [
   { id: "db6b0ed5-d5d3-463d-ae85-518a07d3c2b4", name: "Skylar", desc: "Female · Warm & conversational" },
@@ -44,7 +80,11 @@ export const generateSpeechFn = createServerFn("POST", async ({ data, voiceId }:
 
 export const Route = createFileRoute("/ai-call")({
   head: () => ({ meta: [{ title: "AI Tutor Call — The Flow" }] }),
-  component: AiCallPage,
+  component: () => (
+    <LocalErrorBoundary>
+      <AiCallPage />
+    </LocalErrorBoundary>
+  ),
 });
 
 function getBestFallbackVoice(synth: SpeechSynthesis | null): SpeechSynthesisVoice | null {
