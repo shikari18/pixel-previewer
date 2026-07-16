@@ -58,7 +58,7 @@ function Index() {
 
           <div className="mt-10 space-y-3">
             <Link
-              to="/pricing"
+              to="/signup"
               className="block w-full rounded-2xl bg-white text-black font-medium py-4 text-sm text-center shadow-[0_0_40px_rgba(255,255,255,0.25)]"
             >
               Get Started
