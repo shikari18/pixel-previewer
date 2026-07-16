@@ -132,7 +132,7 @@ Here is everything about The Flow app to help users:
   };
 
   return (
-    <div className="fixed inset-0 bg-[#111111] text-white flex justify-center overflow-hidden page-transition">
+    <div className="fixed inset-0 bg-black text-white flex justify-center overflow-hidden page-transition">
       <div className="relative w-full max-w-md h-full flex flex-col">
         
         {/* Header */}
@@ -194,7 +194,7 @@ Here is everything about The Flow app to help users:
         </div>
 
         {/* Input Footer */}
-        <div className="absolute bottom-0 left-0 right-0 border-t border-white/5 p-4 bg-[#111111]/95 backdrop-blur-md pb-6">
+        <div className="absolute bottom-0 left-0 right-0 border-t border-white/5 p-4 bg-black/95 backdrop-blur-md pb-6">
           <form onSubmit={handleSend} className="flex gap-2">
             <input
               type="text"

@@ -24,7 +24,7 @@ const menuItems = [
   },
   {
     label: "Achievements",
-    to: "/home",
+    to: "/achievements",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
         <path d="M12 15c-3.87 0-7-3.13-7-7V4h14v4c0 3.87-3.13 7-7 7z" />
@@ -116,7 +116,7 @@ const navItems = [
 
 function MorePage() {
   return (
-    <div className="fixed inset-0 bg-[#111111] text-white flex justify-center overflow-hidden page-transition">
+    <div className="fixed inset-0 bg-black text-white flex justify-center overflow-hidden page-transition">
       <div className="relative w-full max-w-md h-full flex flex-col">
 
         {/* Header */}
@@ -144,7 +144,7 @@ function MorePage() {
         </div>
 
         {/* Bottom Nav */}
-        <div className="absolute bottom-0 left-0 right-0 bg-[#111111]/95 backdrop-blur-md border-t border-white/[0.06] px-2 pb-6 pt-3 flex items-center justify-around z-50">
+        <div className="absolute bottom-0 left-0 right-0 bg-black/95 backdrop-blur-md border-t border-white/[0.06] px-2 pb-6 pt-3 flex items-center justify-around z-50">
           {navItems.map((item) => (
             <Link
               key={item.label}

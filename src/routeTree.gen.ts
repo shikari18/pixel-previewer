@@ -21,6 +21,7 @@ import { Route as CollabRouteImport } from './routes/collab'
 import { Route as ChatRouteImport } from './routes/chat'
 import { Route as CalendarRouteImport } from './routes/calendar'
 import { Route as AiCallRouteImport } from './routes/ai-call'
+import { Route as AchievementsRouteImport } from './routes/achievements'
 import { Route as AboutUsRouteImport } from './routes/about-us'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as OnboardingStepRouteImport } from './routes/onboarding.$step'
@@ -85,6 +86,11 @@ const AiCallRoute = AiCallRouteImport.update({
   path: '/ai-call',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AchievementsRoute = AchievementsRouteImport.update({
+  id: '/achievements',
+  path: '/achievements',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AboutUsRoute = AboutUsRouteImport.update({
   id: '/about-us',
   path: '/about-us',
@@ -104,6 +110,7 @@ const OnboardingStepRoute = OnboardingStepRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about-us': typeof AboutUsRoute
+  '/achievements': typeof AchievementsRoute
   '/ai-call': typeof AiCallRoute
   '/calendar': typeof CalendarRoute
   '/chat': typeof ChatRoute
@@ -121,6 +128,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about-us': typeof AboutUsRoute
+  '/achievements': typeof AchievementsRoute
   '/ai-call': typeof AiCallRoute
   '/calendar': typeof CalendarRoute
   '/chat': typeof ChatRoute
@@ -139,6 +147,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/about-us': typeof AboutUsRoute
+  '/achievements': typeof AchievementsRoute
   '/ai-call': typeof AiCallRoute
   '/calendar': typeof CalendarRoute
   '/chat': typeof ChatRoute
@@ -158,6 +167,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/about-us'
+    | '/achievements'
     | '/ai-call'
     | '/calendar'
     | '/chat'
@@ -175,6 +185,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/about-us'
+    | '/achievements'
     | '/ai-call'
     | '/calendar'
     | '/chat'
@@ -192,6 +203,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/about-us'
+    | '/achievements'
     | '/ai-call'
     | '/calendar'
     | '/chat'
@@ -210,6 +222,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutUsRoute: typeof AboutUsRoute
+  AchievementsRoute: typeof AchievementsRoute
   AiCallRoute: typeof AiCallRoute
   CalendarRoute: typeof CalendarRoute
   ChatRoute: typeof ChatRoute
@@ -311,6 +324,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AiCallRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/achievements': {
+      id: '/achievements'
+      path: '/achievements'
+      fullPath: '/achievements'
+      preLoaderRoute: typeof AchievementsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/about-us': {
       id: '/about-us'
       path: '/about-us'
@@ -338,6 +358,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutUsRoute: AboutUsRoute,
+  AchievementsRoute: AchievementsRoute,
   AiCallRoute: AiCallRoute,
   CalendarRoute: CalendarRoute,
   ChatRoute: ChatRoute,

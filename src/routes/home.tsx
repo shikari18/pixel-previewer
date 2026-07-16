@@ -226,14 +226,14 @@ function HomePage() {
   ];
 
   return (
-    <div className="fixed inset-0 bg-[#111111] text-white flex justify-center overflow-hidden page-transition">
+    <div className="fixed inset-0 bg-black text-white flex justify-center overflow-hidden page-transition">
       <div className="relative w-full max-w-md h-full flex flex-col">
 
         {/* Header */}
         {(() => {
           const isScrolled = scrollTop > 20;
           return (
-            <div className={`relative flex items-center w-full px-6 pt-4 pb-3 flex-shrink-0 transition-all duration-300 z-10 bg-[#111111] ${isScrolled ? "border-b border-white/5 bg-[#111111]/90 backdrop-blur-md pt-3 pb-2" : ""}`}>
+            <div className={`relative flex items-center w-full px-6 pt-4 pb-3 flex-shrink-0 transition-all duration-300 z-10 bg-black ${isScrolled ? "border-b border-white/5 bg-black/90 backdrop-blur-md pt-3 pb-2" : ""}`}>
               {/* Left Brand Container (slides/fades out) */}
               <div className={`flex items-center gap-2 transition-all duration-300 ${isScrolled ? "opacity-0 -translate-x-10 pointer-events-none" : "opacity-100 translate-x-0"}`}>
                 <svg width="22" height="16" viewBox="0 0 28 20" fill="none" className="text-white">
@@ -460,7 +460,7 @@ function HomePage() {
         </div>
 
         {/* Pinned Bottom Nav */}
-        <div className="absolute bottom-0 left-0 right-0 bg-[#111111]/95 backdrop-blur-md border-t border-x border-white/[0.06] rounded-t-[20px] px-2 pb-6 pt-3 flex items-center justify-around z-50">
+        <div className="absolute bottom-0 left-0 right-0 bg-black/95 backdrop-blur-md border-t border-x border-white/[0.06] rounded-t-[20px] px-2 pb-6 pt-3 flex items-center justify-around z-50">
           {navItems.map((item) => (
             <Link
               key={item.label}

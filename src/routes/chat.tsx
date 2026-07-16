@@ -186,14 +186,14 @@ RULES:
   );
 
   return (
-    <div className="fixed inset-0 bg-[#111111] text-white flex justify-center overflow-hidden page-transition">
+    <div className="fixed inset-0 bg-black text-white flex justify-center overflow-hidden page-transition">
       <div className="relative w-full max-w-md h-full flex flex-col">
 
         {/* Hidden photo input */}
         <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoSelected} />
 
         {/* Header */}
-        <header className="flex items-center justify-between px-6 pt-6 pb-4 flex-shrink-0 bg-[#111111]">
+        <header className="flex items-center justify-between px-6 pt-6 pb-4 flex-shrink-0 bg-black">
           <div className="flex items-center gap-3">
             <button onClick={() => navigate({ to: "/home" })} className="text-white/70 hover:text-white p-1 transition-colors" aria-label="Back">
               <ArrowLeft className="h-6 w-6" strokeWidth={1.8} />
@@ -270,7 +270,7 @@ RULES:
 
         {/* Fixed input bar — always visible */}
         <div className="fixed bottom-0 left-0 right-0 z-50">
-          <div className="max-w-md mx-auto bg-[#111111]/95 backdrop-blur-md border-t border-white/5 px-4 pt-3 pb-6">
+          <div className="max-w-md mx-auto bg-black/95 backdrop-blur-md border-t border-white/5 px-4 pt-3 pb-6">
             {showAttachments && (
               <div className="relative">
                 <AttachmentDropdown />
