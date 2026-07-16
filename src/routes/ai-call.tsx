@@ -79,6 +79,7 @@ function AiCallPage() {
   const [transcript, setTranscript] = useState("");
   const [aiText, setAiText] = useState("Hi! I'm Mr. Simon. What would you like to study today?");
   const [status, setStatus] = useState<"greeting" | "listening" | "thinking" | "speaking" | "idle">("greeting");
+  const [micError, setMicError] = useState<string | null>(null);
 
   const synthRef = useRef(window.speechSynthesis);
   const recognitionRef = useRef<any>(null);
@@ -99,7 +100,25 @@ function AiCallPage() {
   };
 
   const fallbackSpeak = useCallback((text: string, onDone?: () => void) => {
+    let isDoneTriggered = false;
+    const triggerDone = () => {
+      if (isDoneTriggered) return;
+      isDoneTriggered = true;
+      setIsSpeaking(false);
+      onDone?.();
+    };
+
+    // Calculate dynamic safety timeout based on words (500ms per word + 3s buffer)
+    const wordCount = text.split(/\s+/).length;
+    const safetyTimeoutMs = Math.max(3000, (wordCount * 500) + 3000);
+    const safetyTimer = setTimeout(() => {
+      console.warn("SpeechSynthesis safety timeout hit. Cancelling speech.");
+      synthRef.current.cancel();
+      triggerDone();
+    }, safetyTimeoutMs);
+
     const trySpeak = () => {
+      synthRef.current.cancel(); // cancel any stuck speech
       const utt = new SpeechSynthesisUtterance(text);
       const voice = getBestFemaleVoice(synthRef.current);
       if (voice) utt.voice = voice;
@@ -108,12 +127,12 @@ function AiCallPage() {
       utt.volume = 1.0;
       utt.onstart = () => { setIsSpeaking(true); setStatus("speaking"); };
       utt.onend = () => {
-        setIsSpeaking(false);
-        onDone?.();
+        clearTimeout(safetyTimer);
+        triggerDone();
       };
       utt.onerror = () => {
-        setIsSpeaking(false);
-        onDone?.();
+        clearTimeout(safetyTimer);
+        triggerDone();
       };
       synthRef.current.speak(utt);
     };
@@ -135,30 +154,52 @@ function AiCallPage() {
     setIsSpeaking(true);
     setStatus("speaking");
 
+    let isDoneTriggered = false;
+    const triggerDone = () => {
+      if (isDoneTriggered) return;
+      isDoneTriggered = true;
+      setIsSpeaking(false);
+      onDone?.();
+    };
+
+    // Calculate dynamic safety timeout based on words (500ms per word + 3s buffer)
+    const wordCount = text.split(/\s+/).length;
+    const safetyTimeoutMs = Math.max(3000, (wordCount * 500) + 3000);
+    const safetyTimer = setTimeout(() => {
+      console.warn("TTS Audio play safety timeout hit. Forcing stop.");
+      if (activeAudioRef.current) {
+        activeAudioRef.current.pause();
+        activeAudioRef.current = null;
+      }
+      triggerDone();
+    }, safetyTimeoutMs);
+
     try {
       const base64 = await generateSpeechFn({ data: text });
       const audio = new Audio("data:audio/mp3;base64," + base64);
       activeAudioRef.current = audio;
       
       audio.onended = () => {
-        setIsSpeaking(false);
-        onDone?.();
+        clearTimeout(safetyTimer);
+        triggerDone();
       };
       
       audio.onerror = () => {
+        clearTimeout(safetyTimer);
         console.warn("Audio element failed, falling back to Web Speech API.");
-        fallbackSpeak(text, onDone);
+        fallbackSpeak(text, triggerDone);
       };
 
       await audio.play();
     } catch (e) {
+      clearTimeout(safetyTimer);
       console.warn("generateSpeechFn failed, falling back to Web Speech API:", e);
-      fallbackSpeak(text, onDone);
+      fallbackSpeak(text, triggerDone);
     }
   }, [fallbackSpeak]);
 
   const startListening = useCallback(() => {
-    if (mutedRef.current || listeningRef.current) return;
+    if (mutedRef.current || listeningRef.current || micError) return;
     const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRec) return;
 
@@ -176,9 +217,16 @@ function AiCallPage() {
       await getAiResponse(text);
     };
 
-    recognition.onerror = () => {
+    recognition.onerror = (e: any) => {
       setIsListening(false);
       listeningRef.current = false;
+      
+      if (e.error === "not-allowed") {
+        setMicError("Microphone access denied");
+        setStatus("idle");
+        return; // stop infinite retries if blocked
+      }
+      
       setStatus("idle");
       // retry listening after short pause
       if (!mutedRef.current) setTimeout(startListening, 1500);
@@ -194,7 +242,7 @@ function AiCallPage() {
     setIsListening(true);
     listeningRef.current = true;
     setStatus("listening");
-  }, []);
+  }, [micError]);
 
   const getAiResponse = async (userText: string) => {
     try {
@@ -278,6 +326,9 @@ function AiCallPage() {
   };
 
   const statusLabel = () => {
+    const SpeechRec = typeof window !== "undefined" && ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+    if (!SpeechRec) return "Voice input unsupported in browser";
+    if (micError) return micError;
     if (isMuted) return "Muted";
     if (status === "listening") return "Listening...";
     if (status === "thinking") return "Thinking...";
