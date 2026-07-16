@@ -94,8 +94,8 @@ function Onboarding() {
   // ─── SLIDE 4 — completely rewritten layout ───────────────────────────────
   if (isLast) {
     return (
-      <div className="fixed inset-0 bg-black text-white flex justify-center overflow-hidden page-transition">
-        <div className="relative w-full max-w-md h-full flex flex-col">
+      <div className="fixed inset-0 bg-black text-white flex overflow-hidden page-transition">
+        <div className="relative w-full h-full flex flex-col">
 
           {/* Full-bleed image — top half */}
           <div className="relative w-full flex-1 overflow-hidden">
@@ -139,8 +139,8 @@ function Onboarding() {
   const slide = slides[index];
 
   return (
-    <div className="fixed inset-0 bg-black text-white flex justify-center overflow-hidden page-transition">
-      <div className="relative w-full max-w-md h-full flex flex-col px-8 pt-12 pb-10">
+    <div className="fixed inset-0 bg-black text-white flex overflow-hidden page-transition">
+      <div className="relative w-full h-full flex flex-col px-8 pt-12 pb-10">
         <header className="flex items-center justify-end h-6">
           <button
             onClick={() => navigate({ to: "/" })}

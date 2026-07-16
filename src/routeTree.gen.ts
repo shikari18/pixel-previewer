@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as StreaksRouteImport } from './routes/streaks'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SigninRouteImport } from './routes/signin'
 import { Route as PricingRouteImport } from './routes/pricing'
@@ -26,6 +27,11 @@ import { Route as AboutUsRouteImport } from './routes/about-us'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as OnboardingStepRouteImport } from './routes/onboarding.$step'
 
+const StreaksRoute = StreaksRouteImport.update({
+  id: '/streaks',
+  path: '/streaks',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
@@ -123,6 +129,7 @@ export interface FileRoutesByFullPath {
   '/pricing': typeof PricingRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
+  '/streaks': typeof StreaksRoute
   '/onboarding/$step': typeof OnboardingStepRoute
 }
 export interface FileRoutesByTo {
@@ -141,6 +148,7 @@ export interface FileRoutesByTo {
   '/pricing': typeof PricingRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
+  '/streaks': typeof StreaksRoute
   '/onboarding/$step': typeof OnboardingStepRoute
 }
 export interface FileRoutesById {
@@ -160,6 +168,7 @@ export interface FileRoutesById {
   '/pricing': typeof PricingRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
+  '/streaks': typeof StreaksRoute
   '/onboarding/$step': typeof OnboardingStepRoute
 }
 export interface FileRouteTypes {
@@ -180,6 +189,7 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/signin'
     | '/signup'
+    | '/streaks'
     | '/onboarding/$step'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -198,6 +208,7 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/signin'
     | '/signup'
+    | '/streaks'
     | '/onboarding/$step'
   id:
     | '__root__'
@@ -216,6 +227,7 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/signin'
     | '/signup'
+    | '/streaks'
     | '/onboarding/$step'
   fileRoutesById: FileRoutesById
 }
@@ -235,11 +247,19 @@ export interface RootRouteChildren {
   PricingRoute: typeof PricingRoute
   SigninRoute: typeof SigninRoute
   SignupRoute: typeof SignupRoute
+  StreaksRoute: typeof StreaksRoute
   OnboardingStepRoute: typeof OnboardingStepRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/streaks': {
+      id: '/streaks'
+      path: '/streaks'
+      fullPath: '/streaks'
+      preLoaderRoute: typeof StreaksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/signup': {
       id: '/signup'
       path: '/signup'
@@ -371,6 +391,7 @@ const rootRouteChildren: RootRouteChildren = {
   PricingRoute: PricingRoute,
   SigninRoute: SigninRoute,
   SignupRoute: SignupRoute,
+  StreaksRoute: StreaksRoute,
   OnboardingStepRoute: OnboardingStepRoute,
 }
 export const routeTree = rootRouteImport

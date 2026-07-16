@@ -34,7 +34,7 @@ const menuItems = [
   },
   {
     label: "Streaks",
-    to: "/home",
+    to: "/streaks",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
         <path d="M12 2c0 0-5 4-5 9a5 5 0 0010 0c0-5-5-9-5-9z" />
@@ -116,8 +116,8 @@ const navItems = [
 
 function MorePage() {
   return (
-    <div className="fixed inset-0 bg-black text-white flex justify-center overflow-hidden page-transition">
-      <div className="relative w-full max-w-md h-full flex flex-col">
+    <div className="fixed inset-0 bg-black text-white flex overflow-hidden page-transition">
+      <div className="relative w-full h-full flex flex-col">
 
         {/* Header */}
         <header className="px-6 pt-14 pb-4 flex-shrink-0">

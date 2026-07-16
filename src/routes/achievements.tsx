@@ -70,8 +70,8 @@ function AchievementsPage() {
   ];
 
   return (
-    <div className="fixed inset-0 bg-black text-white flex justify-center overflow-hidden">
-      <div className="relative w-full max-w-md h-full flex flex-col">
+    <div className="fixed inset-0 bg-black text-white flex overflow-hidden">
+      <div className="relative w-full h-full flex flex-col">
 
         {/* Header */}
         <header className="flex items-center px-6 pt-14 pb-4 flex-shrink-0">

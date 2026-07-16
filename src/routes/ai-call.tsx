@@ -212,8 +212,8 @@ function AiCallPage() {
   };
 
   return (
-    <div className="fixed inset-0 bg-black text-white flex justify-center overflow-hidden">
-      <div className="relative w-full max-w-md h-full flex flex-col items-center justify-between py-16 px-8">
+    <div className="fixed inset-0 bg-black text-white flex overflow-hidden">
+      <div className="relative w-full h-full flex flex-col items-center justify-between py-16 px-8">
 
         {/* Top: call info */}
         <div className="text-center space-y-1">

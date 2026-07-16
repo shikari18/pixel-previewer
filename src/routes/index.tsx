@@ -23,8 +23,8 @@ function Index() {
     { label: "Pricing", to: "/pricing" }
   ];
   return (
-    <div className="min-h-screen bg-black text-white flex justify-center page-transition">
-      <div className="relative w-full max-w-md min-h-screen flex flex-col px-8 pt-6 pb-10">
+    <div className="min-h-screen bg-black text-white flex page-transition">
+      <div className="relative w-full min-h-screen flex flex-col px-5 pt-6 pb-10">
         <header className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <svg width="28" height="20" viewBox="0 0 28 20" fill="none" className="text-white">

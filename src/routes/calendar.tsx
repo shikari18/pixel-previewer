@@ -137,8 +137,8 @@ function CalendarPage() {
   ];
 
   return (
-    <div className="fixed inset-0 bg-black text-white flex justify-center overflow-hidden page-transition">
-      <div className="relative w-full max-w-md h-full flex flex-col">
+    <div className="fixed inset-0 bg-black text-white flex overflow-hidden page-transition">
+      <div className="relative w-full h-full flex flex-col">
 
         {/* Header */}
         <header className="px-6 pt-6 pb-3 flex-shrink-0 flex items-center justify-between">

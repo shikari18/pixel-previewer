@@ -186,8 +186,8 @@ RULES:
   );
 
   return (
-    <div className="fixed inset-0 bg-black text-white flex justify-center overflow-hidden page-transition">
-      <div className="relative w-full max-w-md h-full flex flex-col">
+    <div className="fixed inset-0 bg-black text-white flex overflow-hidden page-transition">
+      <div className="relative w-full h-full flex flex-col">
 
         {/* Hidden photo input */}
         <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoSelected} />
@@ -270,7 +270,7 @@ RULES:
 
         {/* Fixed input bar — always visible */}
         <div className="fixed bottom-0 left-0 right-0 z-50">
-          <div className="max-w-md mx-auto bg-black/95 backdrop-blur-md border-t border-white/5 px-4 pt-3 pb-6">
+          <div className="w-full bg-black/95 backdrop-blur-md border-t border-white/5 px-4 pt-3 pb-6">
             {showAttachments && (
               <div className="relative">
                 <AttachmentDropdown />

@@ -132,8 +132,8 @@ Here is everything about The Flow app to help users:
   };
 
   return (
-    <div className="fixed inset-0 bg-black text-white flex justify-center overflow-hidden page-transition">
-      <div className="relative w-full max-w-md h-full flex flex-col">
+    <div className="fixed inset-0 bg-black text-white flex overflow-hidden page-transition">
+      <div className="relative w-full h-full flex flex-col">
         
         {/* Header */}
         <header className="flex items-center justify-between px-6 pt-12 pb-4 flex-shrink-0 border-b border-white/5 bg-white/[0.01]">
