@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 
 export const generateSpeechFn = createServerFn("POST", async ({ data, voiceId }: { data: string; voiceId: string }) => {
   try {
-    const apiKey = process.env.VITE_CARTESIA_API_KEY || process.env.CARTESIA_API_KEY || "sk_car_BpbMPNrmU7RVMoWQ9T4k3A";
+    const apiKey = process.env.VITE_CARTESIA_API_KEY || process.env.CARTESIA_API_KEY || "sk_car_k1szFDXtEbdrUL2VwUtSdo";
     const response = await fetch("https://api.cartesia.ai/tts/bytes", {
       method: "POST",
       headers: {
