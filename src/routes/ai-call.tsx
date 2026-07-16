@@ -6,33 +6,12 @@ import aiSphereImg from "@/assets/my-ai.png";
 
 export const generateSpeechFn = createServerFn("POST", async ({ data }: { data: string }) => {
   try {
-    const fs = await import("fs/promises");
-    const path = await import("path");
-    const { exec } = await import("child_process");
-    const { promisify } = await import("util");
-    const execAsync = promisify(exec);
-
-    const id = Date.now() + "_" + Math.random().toString(36).substr(2, 9);
-    const tempTextFile = path.join(process.cwd(), `temp_text_${id}.txt`);
-    const tempAudioFile = path.join(process.cwd(), `temp_speech_${id}.mp3`);
-
-    // Write text to file safely
-    await fs.writeFile(tempTextFile, data, "utf-8");
-
-    // Execute edge-tts CLI
-    await execAsync(`edge-tts --file "${tempTextFile}" --write-media "${tempAudioFile}" --voice "en-US-BrianNeural"`);
-
-    // Read the generated audio
-    const audioBuffer = await fs.readFile(tempAudioFile);
-    const base64 = audioBuffer.toString("base64");
-
-    // Clean up temp files
-    await Promise.all([
-      fs.unlink(tempTextFile).catch(() => {}),
-      fs.unlink(tempAudioFile).catch(() => {}),
-    ]);
-
-    return base64;
+    const { EdgeTTS } = await import("edge-tts-universal");
+    const tts = new EdgeTTS(data, "en-US-BrianNeural");
+    const result = await tts.synthesize();
+    const arrayBuf = await result.audio.arrayBuffer();
+    const audioBuffer = Buffer.from(arrayBuf);
+    return audioBuffer.toString("base64");
   } catch (err) {
     console.error("Error in TTS server function:", err);
     throw err;
