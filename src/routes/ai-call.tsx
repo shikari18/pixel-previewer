@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { createServerFn } from "@tanstack/react-start";
+import { useServerFn } from "@tanstack/react-start";
 import { Mic, MicOff, Video, PhoneOff, Sliders } from "lucide-react";
 import { useState, useEffect, useRef, useCallback, Component, ReactNode } from "react";
 import aiSphereImg from "@/assets/my-ai.png";
@@ -94,6 +94,7 @@ function playBase64Audio(
 
 function AiCallPage() {
   const navigate = useNavigate();
+  const generateSpeech = useServerFn(generateSpeechFn);
 
   const [isMuted,       setIsMuted]       = useState(false);
   const [isListening,   setIsListening]   = useState(false);
@@ -214,7 +215,7 @@ function AiCallPage() {
     }, Math.max(5000, wordCount * 600 + 4000));
 
     try {
-      const base64 = await generateSpeechFn({ data: text, voiceId: overrideVoiceId ?? voiceIdRef.current });
+      const base64 = await generateSpeech({ data: text, voiceId: overrideVoiceId ?? voiceIdRef.current });
       const { cleanup } = playBase64Audio(
         base64,
         () => { clearTimeout(safety); done(); },
@@ -328,7 +329,7 @@ function AiCallPage() {
 
     // Pre-fetch greeting audio in the background during the 5-second ring
     let greetingBase64: string | null = null;
-    generateSpeechFn({ data: GREETING, voiceId: voiceIdRef.current })
+    generateSpeech({ data: GREETING, voiceId: voiceIdRef.current })
       .then(b64 => { greetingBase64 = b64; })
       .catch(() => {}); // fallback will handle if this fails
 
