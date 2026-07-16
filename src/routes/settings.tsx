@@ -141,7 +141,30 @@ function SettingsPage() {
             <div className="flex flex-col items-center gap-1 px-1">
               <TrendingUp className="h-5 w-5 text-emerald-400" strokeWidth={1.5} />
               <span className="text-lg font-bold text-white leading-tight">85%</span>
-              <span className="text-[9px] text-white/40 font-medium text-center">Progress</span>
+              <span className="text-[9px] text-white/40 font-medium text-center font-medium">Progress</span>
+            </div>
+          </div>
+
+          {/* Subscription Section */}
+          <div className="mb-6">
+            <p className="text-sm font-semibold text-white/40 mb-3 uppercase tracking-wider text-[11px]">Subscription</p>
+            <div className="rounded-2xl border border-white/5 bg-white/[0.02] overflow-hidden">
+              <Link
+                to="/pricing"
+                className="w-full flex items-center justify-between px-4 py-4 hover:bg-white/[0.04] transition-colors text-left"
+              >
+                <div className="flex items-center gap-3">
+                  <Trophy className="h-5 w-5 text-indigo-400" strokeWidth={1.5} />
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-white">Current Plan: Flow Premium</span>
+                    <span className="text-[10px] text-white/40 mt-0.5">GH₵ 15 / month • Renews Aug 16, 2026</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-indigo-400 font-semibold">Manage</span>
+                  <ChevronRight className="h-4 w-4 text-white/20" />
+                </div>
+              </Link>
             </div>
           </div>
 

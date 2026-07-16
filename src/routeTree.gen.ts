@@ -14,6 +14,7 @@ import { Route as StreaksRouteImport } from './routes/streaks'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SigninRouteImport } from './routes/signin'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as SendFeedbackRouteImport } from './routes/send-feedback'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as MoreRouteImport } from './routes/more'
 import { Route as LibraryRouteImport } from './routes/library'
@@ -53,6 +54,11 @@ const SigninRoute = SigninRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SendFeedbackRoute = SendFeedbackRouteImport.update({
+  id: '/send-feedback',
+  path: '/send-feedback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PricingRoute = PricingRouteImport.update({
@@ -146,6 +152,7 @@ export interface FileRoutesByFullPath {
   '/library': typeof LibraryRoute
   '/more': typeof MoreRoute
   '/pricing': typeof PricingRoute
+  '/send-feedback': typeof SendFeedbackRoute
   '/settings': typeof SettingsRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
@@ -168,6 +175,7 @@ export interface FileRoutesByTo {
   '/library': typeof LibraryRoute
   '/more': typeof MoreRoute
   '/pricing': typeof PricingRoute
+  '/send-feedback': typeof SendFeedbackRoute
   '/settings': typeof SettingsRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
@@ -191,6 +199,7 @@ export interface FileRoutesById {
   '/library': typeof LibraryRoute
   '/more': typeof MoreRoute
   '/pricing': typeof PricingRoute
+  '/send-feedback': typeof SendFeedbackRoute
   '/settings': typeof SettingsRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
@@ -215,6 +224,7 @@ export interface FileRouteTypes {
     | '/library'
     | '/more'
     | '/pricing'
+    | '/send-feedback'
     | '/settings'
     | '/signin'
     | '/signup'
@@ -237,6 +247,7 @@ export interface FileRouteTypes {
     | '/library'
     | '/more'
     | '/pricing'
+    | '/send-feedback'
     | '/settings'
     | '/signin'
     | '/signup'
@@ -259,6 +270,7 @@ export interface FileRouteTypes {
     | '/library'
     | '/more'
     | '/pricing'
+    | '/send-feedback'
     | '/settings'
     | '/signin'
     | '/signup'
@@ -282,6 +294,7 @@ export interface RootRouteChildren {
   LibraryRoute: typeof LibraryRoute
   MoreRoute: typeof MoreRoute
   PricingRoute: typeof PricingRoute
+  SendFeedbackRoute: typeof SendFeedbackRoute
   SettingsRoute: typeof SettingsRoute
   SigninRoute: typeof SigninRoute
   SignupRoute: typeof SignupRoute
@@ -325,6 +338,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/send-feedback': {
+      id: '/send-feedback'
+      path: '/send-feedback'
+      fullPath: '/send-feedback'
+      preLoaderRoute: typeof SendFeedbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pricing': {
@@ -450,6 +470,7 @@ const rootRouteChildren: RootRouteChildren = {
   LibraryRoute: LibraryRoute,
   MoreRoute: MoreRoute,
   PricingRoute: PricingRoute,
+  SendFeedbackRoute: SendFeedbackRoute,
   SettingsRoute: SettingsRoute,
   SigninRoute: SigninRoute,
   SignupRoute: SignupRoute,
