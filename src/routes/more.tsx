@@ -18,6 +18,19 @@ function AiTutorIcon({ className = "h-5 w-5" }: { className?: string }) {
 
 const menuItems = [
   {
+    label: "VR Classroom",
+    to: "/vr-classroom",
+    badge: "NEW",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+        <path d="M2 9a2 2 0 012-2h16a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V9z" />
+        <circle cx="8" cy="12" r="2" />
+        <circle cx="16" cy="12" r="2" />
+        <path d="M10 12h4" />
+      </svg>
+    ),
+  },
+  {
     label: "Calendar",
     to: "/calendar",
     icon: <Calendar className="h-5 w-5" />,
@@ -127,15 +140,20 @@ function MorePage() {
         {/* List */}
         <div className="flex-1 overflow-y-auto px-6 pb-28 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           <div className="divide-y divide-white/[0.06]">
-            {menuItems.map((item) => (
+          {menuItems.map((item) => (
               <Link
                 key={item.label}
                 to={item.to}
-                className="flex items-center justify-between py-4 hover:opacity-70 transition-opacity"
+                className={`flex items-center justify-between py-4 hover:opacity-70 transition-opacity ${item.label === "VR Classroom" ? "py-5" : ""}`}
               >
                 <div className="flex items-center gap-4">
-                  <div className="text-white/60">{item.icon}</div>
+                  <div className={`${item.label === "VR Classroom" ? "text-indigo-400" : "text-white/60"}`}>{item.icon}</div>
                   <span className="text-base font-normal text-white">{item.label}</span>
+                  {(item as any).badge && (
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-indigo-400 bg-indigo-500/15 border border-indigo-500/30 rounded-full px-1.5 py-0.5">
+                      {(item as any).badge}
+                    </span>
+                  )}
                 </div>
                 <ChevronRight className="h-4 w-4 text-white/30" strokeWidth={2} />
               </Link>
