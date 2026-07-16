@@ -66,7 +66,7 @@ function AchievementsPage() {
     { icon: <svg className="h-5 w-5" strokeWidth={1.5} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" /></svg>, label: "Library", to: "/library" },
     { icon: <AiTutorIcon className="h-5 w-5" />, label: "AI Tutor", to: "/chat" },
     { icon: <Users className="h-5 w-5" strokeWidth={1.5} />, label: "Collab", to: "/collab" },
-    { icon: <LayoutGrid className="h-5 w-5" strokeWidth={1.5} />, label: "More", to: "/more" },
+    { icon: <LayoutGrid className="h-5 w-5" strokeWidth={1.5} />, label: "More", to: "/more", active: true },
   ];
 
   return (
@@ -74,7 +74,7 @@ function AchievementsPage() {
       <div className="relative w-full h-full flex flex-col">
 
         {/* Header */}
-        <header className="flex items-center px-6 pt-14 pb-4 flex-shrink-0">
+        <header className="flex items-center px-6 pt-6 pb-4 flex-shrink-0">
           <button onClick={() => navigate({ to: "/more" })} className="text-white/60 hover:text-white mr-4 transition-colors">
             <ArrowLeft className="h-6 w-6" strokeWidth={1.5} />
           </button>
@@ -184,9 +184,14 @@ function AchievementsPage() {
         {/* Bottom Nav */}
         <div className="absolute bottom-0 left-0 right-0 bg-black/95 backdrop-blur-md border-t border-white/[0.06] px-2 pb-6 pt-3 flex items-center justify-around z-50">
           {navItems.map((item) => (
-            <Link key={item.label} to={item.to} className="flex flex-col items-center gap-1.5 px-3 text-white/35 hover:text-white/60 transition-colors">
+            <Link
+              key={item.label}
+              to={item.to}
+              className={`flex flex-col items-center gap-1.5 px-3 ${item.active ? "text-white" : "text-white/35 hover:text-white/60 transition-colors"}`}
+            >
               {item.icon}
               <span className="text-[10px] font-medium">{item.label}</span>
+              {item.active && <div className="h-0.5 w-4 bg-white rounded-full -mt-0.5" />}
             </Link>
           ))}
         </div>

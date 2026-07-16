@@ -264,7 +264,7 @@ function FocusTimerPage() {
       <div className="relative w-full h-full flex flex-col">
         
         {/* Header */}
-        <header className="flex items-center justify-between px-6 pt-14 pb-4 flex-shrink-0 bg-black">
+        <header className="flex items-center justify-between px-6 pt-6 pb-4 flex-shrink-0 bg-black">
           <div className="flex items-center">
             <button
               onClick={() => navigate({ to: "/more" })}
