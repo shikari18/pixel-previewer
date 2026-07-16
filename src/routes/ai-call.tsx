@@ -1,7 +1,43 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createServerFn } from "@tanstack/react-start";
 import { Mic, MicOff, Video, PhoneOff } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import aiSphereImg from "@/assets/my-ai.png";
+
+export const generateSpeechFn = createServerFn("POST", async (text: string) => {
+  try {
+    const fs = await import("fs/promises");
+    const path = await import("path");
+    const { exec } = await import("child_process");
+    const { promisify } = await import("util");
+    const execAsync = promisify(exec);
+
+    const id = Date.now() + "_" + Math.random().toString(36).substr(2, 9);
+    const tempTextFile = path.join(process.cwd(), `temp_text_${id}.txt`);
+    const tempAudioFile = path.join(process.cwd(), `temp_speech_${id}.mp3`);
+
+    // Write text to file safely
+    await fs.writeFile(tempTextFile, text, "utf-8");
+
+    // Execute edge-tts CLI
+    await execAsync(`edge-tts --file "${tempTextFile}" --write-media "${tempAudioFile}" --voice "en-US-BrianNeural"`);
+
+    // Read the generated audio
+    const audioBuffer = await fs.readFile(tempAudioFile);
+    const base64 = audioBuffer.toString("base64");
+
+    // Clean up temp files
+    await Promise.all([
+      fs.unlink(tempTextFile).catch(() => {}),
+      fs.unlink(tempAudioFile).catch(() => {}),
+    ]);
+
+    return base64;
+  } catch (err) {
+    console.error("Error in TTS server function:", err);
+    throw err;
+  }
+});
 
 export const Route = createFileRoute("/ai-call")({
   head: () => ({ meta: [{ title: "AI Tutor Call — The Flow" }] }),
@@ -48,6 +84,7 @@ function AiCallPage() {
   const recognitionRef = useRef<any>(null);
   const mutedRef = useRef(false); // track mute in callback without stale closure
   const listeningRef = useRef(false);
+  const activeAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Timer
   useEffect(() => {
@@ -61,9 +98,7 @@ function AiCallPage() {
     return `${m}:${sec}`;
   };
 
-  const speakText = useCallback((text: string, onDone?: () => void) => {
-    synthRef.current.cancel();
-    // Wait for voices to load if needed
+  const fallbackSpeak = useCallback((text: string, onDone?: () => void) => {
     const trySpeak = () => {
       const utt = new SpeechSynthesisUtterance(text);
       const voice = getBestFemaleVoice(synthRef.current);
@@ -89,6 +124,38 @@ function AiCallPage() {
       trySpeak();
     }
   }, []);
+
+  const speakText = useCallback(async (text: string, onDone?: () => void) => {
+    if (activeAudioRef.current) {
+      activeAudioRef.current.pause();
+      activeAudioRef.current = null;
+    }
+    synthRef.current.cancel();
+
+    setIsSpeaking(true);
+    setStatus("speaking");
+
+    try {
+      const base64 = await generateSpeechFn({ data: text });
+      const audio = new Audio("data:audio/mp3;base64," + base64);
+      activeAudioRef.current = audio;
+      
+      audio.onended = () => {
+        setIsSpeaking(false);
+        onDone?.();
+      };
+      
+      audio.onerror = () => {
+        console.warn("Audio element failed, falling back to Web Speech API.");
+        fallbackSpeak(text, onDone);
+      };
+
+      await audio.play();
+    } catch (e) {
+      console.warn("generateSpeechFn failed, falling back to Web Speech API:", e);
+      fallbackSpeak(text, onDone);
+    }
+  }, [fallbackSpeak]);
 
   const startListening = useCallback(() => {
     if (mutedRef.current || listeningRef.current) return;
@@ -142,7 +209,7 @@ function AiCallPage() {
           messages: [
             {
               role: "system",
-              content: "You are Mr. Simon, a warm and knowledgeable AI Tutor. You are on a voice call with a student. Keep responses SHORT — 2-3 sentences max. Be conversational, clear, and encouraging. No markdown, no bullet points — just natural spoken sentences.",
+              content: "You are Mr. Simon, a warm, knowledgeable, and highly interactive AI Tutor. You are on a voice call with a student. Keep responses SHORT — 2-3 sentences max. Do NOT add generic motivational sign-offs or encouraging catchphrases at the end of replies. Always end with a relevant, contextual follow-up question or quiz check based on the topic you just discussed. If the student gets it wrong, calmly explain it in simpler terms and ask another simple check question. If they get it right, praise briefly, move to the next part, and ask a question. Keep it natural, conversational, spoken sentences only, without bullet points or markdown.",
             },
             { role: "user", content: userText },
           ],
@@ -176,6 +243,10 @@ function AiCallPage() {
       if (!mutedRef.current) setTimeout(startListening, 600);
     });
     return () => {
+      if (activeAudioRef.current) {
+        activeAudioRef.current.pause();
+        activeAudioRef.current = null;
+      }
       synthRef.current.cancel();
       if (recognitionRef.current) recognitionRef.current.stop();
     };
@@ -197,6 +268,10 @@ function AiCallPage() {
   };
 
   const endCall = () => {
+    if (activeAudioRef.current) {
+      activeAudioRef.current.pause();
+      activeAudioRef.current = null;
+    }
     synthRef.current.cancel();
     if (recognitionRef.current) recognitionRef.current.stop();
     navigate({ to: "/chat" });
