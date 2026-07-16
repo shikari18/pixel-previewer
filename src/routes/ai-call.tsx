@@ -6,7 +6,7 @@ import aiSphereImg from "@/assets/my-ai.png";
 
 export const generateSpeechFn = createServerFn("POST", async ({ data, voiceId }: { data: string; voiceId: string }) => {
   try {
-    const apiKey = "sk_car_GW1Vfb53x362GSeYoEKV4f";
+    const apiKey = process.env.VITE_CARTESIA_API_KEY || process.env.CARTESIA_API_KEY || "sk_car_GW1Vfb53x362GSeYoEKV4f";
     const response = await fetch("https://api.cartesia.ai/tts/bytes", {
       method: "POST",
       headers: {
@@ -48,7 +48,7 @@ export const Route = createFileRoute("/ai-call")({
   component: AiCallPage,
 });
 
-// Pick the best female voice available
+// Pick the best female voice available (fallback SpeechSynthesis)
 function getBestFemaleVoice(synth: SpeechSynthesis): SpeechSynthesisVoice | null {
   const voices = synth.getVoices();
   const priority = [
@@ -65,7 +65,6 @@ function getBestFemaleVoice(synth: SpeechSynthesis): SpeechSynthesisVoice | null
     const v = voices.find(v => v.name === name);
     if (v) return v;
   }
-  // fallback: any female-sounding voice
   const female = voices.find(v =>
     v.name.toLowerCase().includes("female") ||
     v.name.toLowerCase().includes("woman") ||
@@ -82,22 +81,79 @@ function AiCallPage() {
   const [callDuration, setCallDuration] = useState(0);
   const [transcript, setTranscript] = useState("");
   const [aiText, setAiText] = useState("Hi! I'm Mr. Simon. What would you like to study today?");
-  const [status, setStatus] = useState<"greeting" | "listening" | "thinking" | "speaking" | "idle">("greeting");
+  const [status, setStatus] = useState<"ringing" | "greeting" | "listening" | "thinking" | "speaking" | "idle">("ringing");
   const [micError, setMicError] = useState<string | null>(null);
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>("db6b0ed5-d5d3-463d-ae85-518a07d3c2b4");
   const [voicePanelOpen, setVoicePanelOpen] = useState(false);
+  const [isCameraOn, setIsCameraOn] = useState(false);
 
   const synthRef = useRef(window.speechSynthesis);
   const recognitionRef = useRef<any>(null);
   const mutedRef = useRef(false); // track mute in callback without stale closure
   const listeningRef = useRef(false);
   const activeAudioRef = useRef<HTMLAudioElement | null>(null);
+  const ringingAudioRef = useRef<{ stop: () => void } | null>(null);
+  
+  // Video and stream references
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
-  // Timer
+  // Ringing oscillator sound creator (runs for 5 seconds on mount)
+  const startRingingAudio = () => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return null;
+      const ctx = new AudioCtx();
+      
+      const playTone = () => {
+        if (ctx.state === "suspended") {
+          ctx.resume();
+        }
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        
+        osc1.frequency.setValueAtTime(440, ctx.currentTime);
+        osc2.frequency.setValueAtTime(480, ctx.currentTime);
+        
+        gainNode.gain.setValueAtTime(0, ctx.currentTime);
+        gainNode.gain.linearRampToValueAtTime(0.08, ctx.currentTime + 0.15);
+        gainNode.gain.setValueAtTime(0.08, ctx.currentTime + 1.6);
+        gainNode.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.8);
+        
+        osc1.connect(gainNode);
+        osc2.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        
+        osc1.start();
+        osc2.start();
+        
+        osc1.stop(ctx.currentTime + 1.8);
+        osc2.stop(ctx.currentTime + 1.8);
+      };
+
+      // Play immediately
+      playTone();
+      const interval = setInterval(playTone, 2500);
+      
+      return {
+        stop: () => {
+          clearInterval(interval);
+          ctx.close().catch(() => {});
+        }
+      };
+    } catch (e) {
+      console.warn("Failed to play ringing tone:", e);
+      return null;
+    }
+  };
+
+  // Call Duration Timer (only runs once call connects)
   useEffect(() => {
+    if (status === "ringing") return;
     const iv = setInterval(() => setCallDuration(d => d + 1), 1000);
     return () => clearInterval(iv);
-  }, []);
+  }, [status]);
 
   const formatDuration = (s: number) => {
     const m = Math.floor(s / 60).toString().padStart(2, "0");
@@ -105,6 +161,7 @@ function AiCallPage() {
     return `${m}:${sec}`;
   };
 
+  // Web Speech synthesis fallback
   const fallbackSpeak = useCallback((text: string, onDone?: () => void) => {
     let isDoneTriggered = false;
     const triggerDone = () => {
@@ -114,7 +171,6 @@ function AiCallPage() {
       onDone?.();
     };
 
-    // Calculate dynamic safety timeout based on words (500ms per word + 3s buffer)
     const wordCount = text.split(/\s+/).length;
     const safetyTimeoutMs = Math.max(3000, (wordCount * 500) + 3000);
     const safetyTimer = setTimeout(() => {
@@ -124,7 +180,7 @@ function AiCallPage() {
     }, safetyTimeoutMs);
 
     const trySpeak = () => {
-      synthRef.current.cancel(); // cancel any stuck speech
+      synthRef.current.cancel(); 
       const utt = new SpeechSynthesisUtterance(text);
       const voice = getBestFemaleVoice(synthRef.current);
       if (voice) utt.voice = voice;
@@ -150,6 +206,7 @@ function AiCallPage() {
     }
   }, []);
 
+  // Primary speech controller (Cartesia)
   const speakText = useCallback(async (text: string, onDone?: () => void) => {
     if (activeAudioRef.current) {
       activeAudioRef.current.pause();
@@ -168,7 +225,6 @@ function AiCallPage() {
       onDone?.();
     };
 
-    // Calculate dynamic safety timeout based on words (500ms per word + 3s buffer)
     const wordCount = text.split(/\s+/).length;
     const safetyTimeoutMs = Math.max(3000, (wordCount * 500) + 3000);
     const safetyTimer = setTimeout(() => {
@@ -204,43 +260,49 @@ function AiCallPage() {
     }
   }, [fallbackSpeak, selectedVoiceId]);
 
+  // Continuous speech recognition loop (eliminates iPhone toggling bug)
   const startListening = useCallback(() => {
     if (mutedRef.current || listeningRef.current || micError) return;
     const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRec) return;
 
     const recognition = new SpeechRec();
-    recognition.continuous = false;
+    recognition.continuous = true;
     recognition.interimResults = false;
     recognition.lang = "en-US";
 
     recognition.onresult = async (e: any) => {
-      const text = e.results[0][0].transcript;
+      const text = e.results[e.results.length - 1][0].transcript;
       setTranscript(text);
+      
+      // Mute mic recognition session temporarily so AI output isn't heard
+      recognition.stop();
       setIsListening(false);
       listeningRef.current = false;
+      
       setStatus("thinking");
       await getAiResponse(text);
     };
 
     recognition.onerror = (e: any) => {
-      setIsListening(false);
-      listeningRef.current = false;
-      
       if (e.error === "not-allowed") {
         setMicError("Microphone access denied");
+        setIsListening(false);
+        listeningRef.current = false;
         setStatus("idle");
-        return; // stop infinite retries if blocked
+        return;
       }
-      
-      setStatus("idle");
-      // retry listening after short pause
-      if (!mutedRef.current) setTimeout(startListening, 1500);
+      // Silently ignore other errors (like no-speech) to prevent mic toggles
+      console.log("Speech recognition error:", e.error);
     };
 
     recognition.onend = () => {
       setIsListening(false);
       listeningRef.current = false;
+      // Auto-restart if we are in listening mode and unmuted
+      if (!mutedRef.current && status === "listening") {
+        setTimeout(startListening, 600);
+      }
     };
 
     recognitionRef.current = recognition;
@@ -248,7 +310,7 @@ function AiCallPage() {
     setIsListening(true);
     listeningRef.current = true;
     setStatus("listening");
-  }, [micError]);
+  }, [micError, status]);
 
   const getAiResponse = async (userText: string) => {
     try {
@@ -275,53 +337,106 @@ function AiCallPage() {
       const reply = data.choices?.[0]?.message?.content || "Could you repeat that?";
       setAiText(reply);
       speakText(reply, () => {
-        setStatus("idle");
-        // Auto-listen again after AI finishes speaking
-        if (!mutedRef.current) setTimeout(startListening, 600);
+        setStatus("listening");
       });
     } catch {
       const err = "I had trouble connecting. Please try again.";
       setAiText(err);
       speakText(err, () => {
-        setStatus("idle");
-        if (!mutedRef.current) setTimeout(startListening, 600);
+        setStatus("listening");
       });
     }
   };
 
-  // On mount: speak greeting then start listening
+  // Video feed sharing toggle
+  const toggleCamera = async () => {
+    if (isCameraOn) {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+      setIsCameraOn(false);
+    } else {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" } } // Ideal for showing workspace / books
+        });
+        streamRef.current = stream;
+        setIsCameraOn(true);
+        setTimeout(() => {
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+          }
+        }, 150);
+      } catch (err) {
+        console.error("Camera access failed:", err);
+        alert("Unable to open camera. Please verify permissions.");
+      }
+    }
+  };
+
+  // On mount: play ring tone for exactly 5 seconds, then pick up and connect
   useEffect(() => {
-    const greeting = "Hi! I'm Mr. Simon. What would you like to study today?";
-    speakText(greeting, () => {
-      setStatus("idle");
-      if (!mutedRef.current) setTimeout(startListening, 600);
-    });
+    setStatus("ringing");
+    const ringing = startRingingAudio();
+    ringingAudioRef.current = ringing;
+
+    const connectTimeout = setTimeout(() => {
+      if (ringingAudioRef.current) {
+        ringingAudioRef.current.stop();
+        ringingAudioRef.current = null;
+      }
+      
+      setStatus("greeting");
+      const greeting = "Hi! I'm Mr. Simon. What would you like to study today?";
+      speakText(greeting, () => {
+        setStatus("listening");
+      });
+    }, 5000);
+
     return () => {
+      clearTimeout(connectTimeout);
+      if (ringingAudioRef.current) {
+        ringingAudioRef.current.stop();
+        ringingAudioRef.current = null;
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
       if (activeAudioRef.current) {
         activeAudioRef.current.pause();
-        activeAudioRef.current = null;
       }
       synthRef.current.cancel();
       if (recognitionRef.current) recognitionRef.current.stop();
     };
-  }, [speakText, startListening]);
+  }, []);
+
+  // Sync listening state with status changes
+  useEffect(() => {
+    if (status === "listening" && !isSpeaking && !isMuted) {
+      startListening();
+    }
+  }, [status, isSpeaking, isMuted, startListening]);
 
   const toggleMute = () => {
     const newMuted = !isMuted;
     setIsMuted(newMuted);
     mutedRef.current = newMuted;
     if (newMuted) {
-      // Stop listening when muted
       if (recognitionRef.current) recognitionRef.current.stop();
       setIsListening(false);
       listeningRef.current = false;
     } else {
-      // Resume listening when unmuted
-      if (!isSpeaking) setTimeout(startListening, 400);
+      if (status === "listening" && !isSpeaking) {
+        setTimeout(startListening, 300);
+      }
     }
   };
 
   const endCall = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+    }
     if (activeAudioRef.current) {
       activeAudioRef.current.pause();
       activeAudioRef.current = null;
@@ -336,6 +451,7 @@ function AiCallPage() {
     if (!SpeechRec) return "Voice input unsupported in browser";
     if (micError) return micError;
     if (isMuted) return "Muted";
+    if (status === "ringing") return "Ringing...";
     if (status === "listening") return "Listening...";
     if (status === "thinking") return "Thinking...";
     if (status === "speaking") return "Speaking...";
@@ -359,20 +475,20 @@ function AiCallPage() {
         {/* Top: call info */}
         <div className="text-center space-y-1">
           <p className="text-xs text-white/40 font-medium tracking-widest uppercase">AI Tutor · Voice Call</p>
-          <p className="text-sm font-mono text-white/50">{formatDuration(callDuration)}</p>
+          <p className="text-sm font-mono text-white/50">{status === "ringing" ? "00:00" : formatDuration(callDuration)}</p>
         </div>
 
         {/* Center: avatar + status */}
         <div className="flex flex-col items-center gap-5">
-          {/* Avatar with pulse ring when speaking */}
+          {/* Avatar with pulse ring when speaking or ringing */}
           <div className="relative">
-            {isSpeaking && (
+            {(isSpeaking || status === "ringing") && (
               <>
                 <div className="absolute inset-0 rounded-full animate-ping bg-indigo-400/15 scale-110" />
                 <div className="absolute inset-0 rounded-full animate-pulse bg-indigo-400/10 scale-125" />
               </>
             )}
-            <div className={`rounded-full transition-all duration-300 ${isSpeaking ? "ring-2 ring-indigo-400/60 ring-offset-4 ring-offset-black" : ""}`}>
+            <div className={`rounded-full transition-all duration-300 ${isSpeaking || status === "ringing" ? "ring-2 ring-indigo-400/60 ring-offset-4 ring-offset-black" : ""}`}>
               <img
                 src={aiSphereImg}
                 alt="Mr. Simon"
@@ -387,6 +503,7 @@ function AiCallPage() {
               status === "listening" ? "text-emerald-400" :
               status === "thinking" ? "text-amber-400" :
               status === "speaking" ? "text-indigo-400" :
+              status === "ringing" ? "text-indigo-300 animate-pulse" :
               isMuted ? "text-red-400" :
               "text-white/40"
             }`}>
@@ -396,24 +513,46 @@ function AiCallPage() {
 
           {/* AI last response */}
           <div className="max-w-[280px] text-center min-h-[60px] flex items-center justify-center">
-            <p className="text-sm text-white/55 leading-relaxed italic">"{aiText}"</p>
+            <p className="text-sm text-white/55 leading-relaxed italic">
+              {status === "ringing" ? "Calling AI Tutor..." : `"${aiText}"`}
+            </p>
           </div>
 
           {/* User last said */}
-          {transcript && (
+          {transcript && status !== "ringing" && (
             <p className="text-xs text-white/25 text-center max-w-[240px]">You: "{transcript}"</p>
           )}
         </div>
 
+        {/* Floating Video Share View (Picture in Picture) */}
+        {isCameraOn && (
+          <div className="absolute bottom-32 right-6 w-32 h-44 rounded-2xl border border-white/10 bg-zinc-950 overflow-hidden shadow-2xl z-30 animate-in fade-in duration-200">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute bottom-2 left-2 px-1.5 py-0.5 rounded bg-black/60 text-[8px] text-white font-bold uppercase tracking-wider">
+              Share View
+            </div>
+          </div>
+        )}
+
         {/* Bottom: controls */}
         <div className="flex items-end justify-center gap-10">
 
-          {/* Video — left */}
-          <button className="flex flex-col items-center gap-2" onClick={() => {}}>
-            <div className="h-14 w-14 rounded-full bg-white/[0.08] border border-white/10 flex items-center justify-center hover:bg-white/[0.14] transition-colors">
-              <Video className="h-6 w-6 text-white/60" strokeWidth={1.8} />
+          {/* Video Share Button */}
+          <button className="flex flex-col items-center gap-2" onClick={toggleCamera}>
+            <div className={`h-14 w-14 rounded-full border flex items-center justify-center active:scale-95 transition-all ${
+              isCameraOn
+                ? "bg-indigo-600/20 border-indigo-400/40"
+                : "bg-white/[0.08] border-white/10"
+            }`}>
+              <Video className={`h-6 w-6 ${isCameraOn ? "text-indigo-400" : "text-white/60"}`} strokeWidth={1.8} />
             </div>
-            <span className="text-[10px] text-white/35">Video</span>
+            <span className="text-[10px] text-white/35">{isCameraOn ? "Camera Off" : "Video"}</span>
           </button>
 
           {/* End call — center, larger */}
@@ -443,99 +582,104 @@ function AiCallPage() {
 
         </div>
 
-        {/* Slide-out Voice Select Panel */}
+        {/* Centered Glassmorphism Voice Selector Modal */}
         {voicePanelOpen && (
-          <div className="absolute top-0 right-0 z-50 h-full w-72 bg-black/95 border-l border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.8)] flex flex-col p-6 animate-in slide-in-from-right duration-250">
-            
-            {/* Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-6">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Volume2 className="h-5 w-5 text-indigo-400" />
-                Select Voice
-              </h3>
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-5 animate-in fade-in duration-200">
+            <div className="w-full max-w-sm bg-zinc-900/95 border border-white/10 rounded-3xl p-6 shadow-2xl flex flex-col animate-in zoom-in-95 duration-200">
+              
+              {/* Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-5">
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <Volume2 className="h-5 w-5 text-indigo-400" />
+                  Select Voice
+                </h3>
+                <button
+                  onClick={() => setVoicePanelOpen(false)}
+                  className="text-white/40 hover:text-white p-1 transition-colors"
+                  aria-label="Close"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* List of Voices */}
+              <div className="space-y-5 max-h-[300px] overflow-y-auto pr-1 select-none [&::-webkit-scrollbar]:hidden">
+                
+                {/* Female Section */}
+                <div>
+                  <p className="text-[9px] font-bold text-white/30 uppercase tracking-widest mb-2.5">Realistic Female Voices</p>
+                  <div className="space-y-2">
+                    {[
+                      { id: "db6b0ed5-d5d3-463d-ae85-518a07d3c2b4", name: "Skylar", desc: "Warm & conversational" },
+                      { id: "f786b574-daa5-4673-aa0c-cbe3e8534c02", name: "Katie", desc: "Expressive & clear" }
+                    ].map((v) => (
+                      <button
+                        key={v.id}
+                        onClick={() => {
+                          setSelectedVoiceId(v.id);
+                          setVoicePanelOpen(false);
+                        }}
+                        className={`w-full p-3 rounded-xl border text-left flex items-center justify-between transition-all ${
+                          selectedVoiceId === v.id
+                            ? "bg-indigo-600/10 border-indigo-500 text-white shadow-[0_0_12px_rgba(99,102,241,0.08)]"
+                            : "bg-white/[0.02] border-white/5 text-white/60 hover:bg-white/[0.04] hover:text-white"
+                        }`}
+                      >
+                        <div>
+                          <p className="text-xs font-bold">{v.name}</p>
+                          <p className="text-[9px] text-white/40 mt-0.5">{v.desc}</p>
+                        </div>
+                        {selectedVoiceId === v.id && (
+                          <Check className="h-4.5 w-4.5 text-indigo-400 flex-shrink-0" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Male Section */}
+                <div>
+                  <p className="text-[9px] font-bold text-white/30 uppercase tracking-widest mb-2.5">Realistic Male Voices</p>
+                  <div className="space-y-2">
+                    {[
+                      { id: "a5136bf9-224c-4d76-b823-52bd5efcffcc", name: "Jameson", desc: "Deep & natural" },
+                      { id: "ef191366-f52f-447a-a398-ed8c0f2943a1", name: "Archie", desc: "Friendly & professional" }
+                    ].map((v) => (
+                      <button
+                        key={v.id}
+                        onClick={() => {
+                          setSelectedVoiceId(v.id);
+                          setVoicePanelOpen(false);
+                        }}
+                        className={`w-full p-3 rounded-xl border text-left flex items-center justify-between transition-all ${
+                          selectedVoiceId === v.id
+                            ? "bg-indigo-600/10 border-indigo-500 text-white shadow-[0_0_12px_rgba(99,102,241,0.08)]"
+                            : "bg-white/[0.02] border-white/5 text-white/60 hover:bg-white/[0.04] hover:text-white"
+                        }`}
+                      >
+                        <div>
+                          <p className="text-xs font-bold">{v.name}</p>
+                          <p className="text-[9px] text-white/40 mt-0.5">{v.desc}</p>
+                        </div>
+                        {selectedVoiceId === v.id && (
+                          <Check className="h-4.5 w-4.5 text-indigo-400 flex-shrink-0" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Close Button */}
               <button
                 onClick={() => setVoicePanelOpen(false)}
-                className="text-white/40 hover:text-white p-1 transition-colors"
-                aria-label="Close"
+                className="mt-5 w-full py-2.5 bg-zinc-800 hover:bg-zinc-700 active:scale-[0.98] transition-all text-white font-semibold text-xs rounded-xl"
               >
-                <X className="h-5 w-5" />
+                Close
               </button>
-            </div>
-
-            {/* List of Voices */}
-            <div className="flex-1 overflow-y-auto space-y-6 pr-1 select-none [&::-webkit-scrollbar]:hidden">
-              
-              {/* Female Voices Section */}
-              <div>
-                <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-3">Realistic Female Voices</p>
-                <div className="space-y-2.5">
-                  {[
-                    { id: "db6b0ed5-d5d3-463d-ae85-518a07d3c2b4", name: "Skylar", desc: "Warm & conversational" },
-                    { id: "f786b574-daa5-4673-aa0c-cbe3e8534c02", name: "Katie", desc: "Expressive & clear" }
-                  ].map((v) => (
-                    <button
-                      key={v.id}
-                      onClick={() => {
-                        setSelectedVoiceId(v.id);
-                        setVoicePanelOpen(false);
-                      }}
-                      className={`w-full p-3.5 rounded-xl border text-left flex items-center justify-between transition-all ${
-                        selectedVoiceId === v.id
-                          ? "bg-indigo-600/10 border-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.1)]"
-                          : "bg-white/[0.02] border-white/5 text-white/60 hover:bg-white/[0.04] hover:text-white"
-                      }`}
-                    >
-                      <div>
-                        <p className="text-sm font-bold">{v.name}</p>
-                        <p className="text-[10px] text-white/40 mt-0.5">{v.desc}</p>
-                      </div>
-                      {selectedVoiceId === v.id && (
-                        <Check className="h-4.5 w-4.5 text-indigo-400 flex-shrink-0" />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Male Voices Section */}
-              <div>
-                <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-3">Realistic Male Voices</p>
-                <div className="space-y-2.5">
-                  {[
-                    { id: "a5136bf9-224c-4d76-b823-52bd5efcffcc", name: "Jameson", desc: "Deep & natural" },
-                    { id: "ef191366-f52f-447a-a398-ed8c0f2943a1", name: "Archie", desc: "Friendly & professional" }
-                  ].map((v) => (
-                    <button
-                      key={v.id}
-                      onClick={() => {
-                        setSelectedVoiceId(v.id);
-                        setVoicePanelOpen(false);
-                      }}
-                      className={`w-full p-3.5 rounded-xl border text-left flex items-center justify-between transition-all ${
-                        selectedVoiceId === v.id
-                          ? "bg-indigo-600/10 border-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.1)]"
-                          : "bg-white/[0.02] border-white/5 text-white/60 hover:bg-white/[0.04] hover:text-white"
-                      }`}
-                    >
-                      <div>
-                        <p className="text-sm font-bold">{v.name}</p>
-                        <p className="text-[10px] text-white/40 mt-0.5">{v.desc}</p>
-                      </div>
-                      {selectedVoiceId === v.id && (
-                        <Check className="h-4.5 w-4.5 text-indigo-400 flex-shrink-0" />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
 
             </div>
-
-            {/* Footer feedback */}
-            <div className="pt-4 border-t border-white/10 text-center">
-              <p className="text-[9px] text-white/30 font-medium">Select a voice to apply it to the next response.</p>
-            </div>
-
           </div>
         )}
 
