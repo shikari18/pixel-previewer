@@ -47,7 +47,8 @@ export const Route = createFileRoute("/ai-call")({
   component: AiCallPage,
 });
 
-function getBestFallbackVoice(synth: SpeechSynthesis): SpeechSynthesisVoice | null {
+function getBestFallbackVoice(synth: SpeechSynthesis | null): SpeechSynthesisVoice | null {
+  if (!synth) return null;
   const voices = synth.getVoices();
   const preferred = ["Samantha", "Karen", "Moira", "Tessa", "Google UK English Female", "Google US English"];
   for (const name of preferred) {
@@ -95,7 +96,7 @@ function AiCallPage() {
   const [sheetOpen,     setSheetOpen]     = useState(false);
   const [isCameraOn,    setIsCameraOn]    = useState(false);
 
-  const synthRef        = useRef(window.speechSynthesis);
+  const synthRef        = useRef<SpeechSynthesis | null>(null);
   const recognitionRef  = useRef<any>(null);
   const mutedRef        = useRef(false);
   const listeningRef    = useRef(false);
@@ -104,6 +105,13 @@ function AiCallPage() {
   const videoRef        = useRef<HTMLVideoElement | null>(null);
   const streamRef       = useRef<MediaStream | null>(null);
   const voiceIdRef      = useRef(voiceId);
+
+  // Initialize browser-only refs once on client
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      synthRef.current = window.speechSynthesis;
+    }
+  }, []);
 
   // Keep voiceIdRef in sync so callbacks always read the latest value
   useEffect(() => { voiceIdRef.current = voiceId; }, [voiceId]);
@@ -153,9 +161,10 @@ function AiCallPage() {
     let fired = false;
     const done = () => { if (fired) return; fired = true; setIsSpeaking(false); onDone?.(); };
     const wordCount = text.split(/\s+/).length;
-    const timer = setTimeout(() => { synthRef.current.cancel(); done(); }, Math.max(4000, wordCount * 550 + 3000));
+    const timer = setTimeout(() => { synthRef.current?.cancel(); done(); }, Math.max(4000, wordCount * 550 + 3000));
     const speak = () => {
-      synthRef.current.cancel();
+      if (!synthRef.current) { done(); return; }
+      synthRef.current?.cancel();
       const utt = new SpeechSynthesisUtterance(text);
       const voice = getBestFallbackVoice(synthRef.current);
       if (voice) utt.voice = voice;
@@ -165,8 +174,9 @@ function AiCallPage() {
       utt.onerror = () => { clearTimeout(timer); done(); };
       synthRef.current.speak(utt);
     };
-    if (synthRef.current.getVoices().length === 0) {
-      window.speechSynthesis.onvoiceschanged = speak;
+    if (!synthRef.current || synthRef.current.getVoices().length === 0) {
+      if (typeof window !== "undefined") window.speechSynthesis.onvoiceschanged = speak;
+      else done();
     } else {
       speak();
     }
@@ -177,7 +187,7 @@ function AiCallPage() {
     // Stop any current audio
     audioCleanupRef.current?.();
     audioCleanupRef.current = null;
-    synthRef.current.cancel();
+    synthRef.current?.cancel();
 
     setIsSpeaking(true);
     setStatus("speaking");
@@ -346,7 +356,7 @@ function AiCallPage() {
       ringingRef.current?.stop();
       streamRef.current?.getTracks().forEach(t => t.stop());
       audioCleanupRef.current?.();
-      synthRef.current.cancel();
+      synthRef.current?.cancel();
       recognitionRef.current?.stop();
     };
   }, []); // eslint-disable-line
@@ -376,7 +386,7 @@ function AiCallPage() {
   const endCall = () => {
     streamRef.current?.getTracks().forEach(t => t.stop());
     audioCleanupRef.current?.();
-    synthRef.current.cancel();
+    synthRef.current?.cancel();
     recognitionRef.current?.stop();
     navigate({ to: "/chat" });
   };
