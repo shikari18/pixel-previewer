@@ -8,8 +8,9 @@ export const Route = createFileRoute("/vr-classroom")({
   component: VrClassroomPage,
 });
 
-const PROFESSOR_VOICE_ID = "ef191366-f52f-447a-a398-ed8c0f2943a1";
-const SPHERE_R = 60; // radius in px — total rendered size = 2*SPHERE_R
+// Skylar — approachable American female voice from Cartesia library
+const VOICE_ID = "db6b0ed5-d5d3-463d-ae85-518a07d3c2b4";
+const SPHERE_R = 70; // px radius
 
 // ── AUDIO ────────────────────────────────────────────────────────────────
 function playBase64Audio(
@@ -17,15 +18,17 @@ function playBase64Audio(
   base64: string,
   onEnded: () => void,
   onError: () => void
-): { cleanup: () => void } {
+): () => void {
   let source: AudioBufferSourceNode | null = null;
   let active = true;
   try {
     const binary = atob(base64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    // Copy buffer so decodeAudioData owns it
+    const copy = bytes.buffer.slice(0);
     ctx.decodeAudioData(
-      bytes.buffer,
+      copy,
       (buf) => {
         if (!active) return;
         source = ctx.createBufferSource();
@@ -34,14 +37,12 @@ function playBase64Audio(
         source.onended = () => { if (active) onEnded(); };
         source.start(0);
       },
-      () => { if (active) onError(); }
+      (e) => { console.error("decode error", e); if (active) onError(); }
     );
-  } catch { if (active) onError(); }
-  return {
-    cleanup: () => {
-      active = false;
-      if (source) { try { source.stop(); } catch (_e) {} }
-    },
+  } catch (e) { console.error("playback error", e); if (active) onError(); }
+  return () => {
+    active = false;
+    if (source) { try { source.stop(); } catch (_) {} }
   };
 }
 
@@ -59,7 +60,10 @@ const SUBJECTS = [
 const DURATION_OPTIONS = [20, 30, 45, 60, 90];
 
 // ── AI ────────────────────────────────────────────────────────────────────
-async function getLessonText(subject: string, topic: string, history: { role: string; content: string }[]): Promise<string> {
+async function getLessonText(
+  subject: string, topic: string,
+  history: { role: string; content: string }[]
+): Promise<string> {
   try {
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
@@ -67,9 +71,9 @@ async function getLessonText(subject: string, topic: string, history: { role: st
       body: JSON.stringify({
         model: "llama-3.3-70b-versatile",
         messages: [
-          { role: "system", content: `You are a brilliant AI professor teaching ${subject} on "${topic}". 3–4 vivid sentences per segment. Progress the lecture. Real-world analogies. No markdown, no bullets.` },
+          { role: "system", content: `You are a brilliant AI professor teaching ${subject} — topic: "${topic}". Speak in 3–4 vivid, flowing sentences. Progress naturally. Use real-world analogies. No markdown, no lists.` },
           ...history,
-          { role: "user", content: "Continue." },
+          { role: "user", content: "Continue the lecture." },
         ],
         max_tokens: 160, temperature: 0.75,
       }),
@@ -86,214 +90,144 @@ async function getImagePrompt(subject: string, topic: string, seg: number): Prom
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_GROQ_API_KEY}` },
       body: JSON.stringify({
         model: "llama-3.3-70b-versatile",
-        messages: [{ role: "system", content: `Image prompt for ${subject} concept "${topic}" segment ${seg}. Visual, educational. Under 18 words. No quotes.` }],
+        messages: [{ role: "system", content: `Image generation prompt for ${subject} concept "${topic}" (segment ${seg}). Visual, educational, beautiful. Under 18 words. No quotes.` }],
         max_tokens: 40, temperature: 0.8,
       }),
     });
     const d = await res.json();
-    return d.choices?.[0]?.message?.content?.trim() || `${topic} concept art`;
-  } catch { return `${topic} educational diagram`; }
+    return d.choices?.[0]?.message?.content?.trim() || `${topic} concept`;
+  } catch { return `${topic} educational art`; }
 }
 
-function buildImageUrl(prompt: string): string {
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt + ", dark background, vibrant")}?width=480&height=300&nologo=true`;
-}
+const buildImageUrl = (p: string) =>
+  `https://image.pollinations.ai/prompt/${encodeURIComponent(p + ", dark background, vibrant colors")}?width=480&height=300&nologo=true`;
 
-// ── WAYPOINTS — kept in 20–80% range so bot is always fully visible ───────
+// ── SPHERE FLOAT ANIMATION (CSS-based, smooth) ────────────────────────────
+// We drive position entirely with CSS transitions + a slow interval
+// so the movement is butter-smooth without a RAF loop eating frames.
 const WAYPOINTS = [
-  { x: 20, y: 30, s: 1.2 },
-  { x: 55, y: 22, s: 2.0 },
-  { x: 78, y: 40, s: 0.6 },
-  { x: 65, y: 65, s: 1.5 },
-  { x: 35, y: 72, s: 0.8 },
-  { x: 18, y: 55, s: 1.8 },
-  { x: 42, y: 45, s: 0.5 },
-  { x: 70, y: 28, s: 2.2 },
-  { x: 50, y: 70, s: 1.0 },
-  { x: 25, y: 40, s: 1.4 },
+  { x: 22, y: 30 }, { x: 55, y: 20 }, { x: 78, y: 38 },
+  { x: 68, y: 65 }, { x: 38, y: 72 }, { x: 18, y: 55 },
+  { x: 45, y: 42 }, { x: 72, y: 25 }, { x: 50, y: 68 },
+  { x: 25, y: 40 },
 ];
 
-interface SphereState {
-  x: number; y: number;
-  tx: number; ty: number;
-  wpIdx: number; speed: number;
-  bob: number; frame: number;
-  projecting: boolean;
-  imageUrl: string | null;
-  imageLoaded: boolean;
-  facing: "left" | "right";
-}
-
-function useSphereAnimation(
-  active: boolean,
-  W: number,
-  H: number,
+function useSmoothFloat(
+  active: boolean, W: number, H: number,
   onProject: (idx: number) => void
 ) {
-  const PAD = SPHERE_R + 8;
-  const s = useRef<SphereState>({
-    x: W * 0.5, y: H * 0.5, tx: W * 0.5, ty: H * 0.5,
-    wpIdx: 0, speed: 1.5, bob: 0, frame: 0,
-    projecting: false, imageUrl: null, imageLoaded: false, facing: "right",
-  });
-  const [pos, setPos] = useState({ x: W * 0.5, y: H * 0.5, bob: 0, facing: "right" as "left" | "right", projecting: false, imageUrl: null as string | null, imageLoaded: false });
-  const raf = useRef<number | null>(null);
-  const arrTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const projTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const PAD = SPHERE_R + 10;
+  const [pos, setPos] = useState({ x: W * 0.5, y: H * 0.5 });
+  const [dur, setDur] = useState(3.5); // CSS transition duration in seconds
+  const wpIdx = useRef(0);
+  const projecting = useRef(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const tick = useCallback(() => {
-    if (!active) return;
-    const st = s.current;
-    st.frame++;
-    st.bob = Math.sin(st.frame * 0.04) * 8;
-
-    const dx = st.tx - st.x;
-    const dy = st.ty - st.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-
-    if (dist > 1.5) {
-      const mv = Math.min(dist, st.speed);
-      st.x += (dx / dist) * mv;
-      st.y += (dy / dist) * mv;
-      if (dx !== 0) st.facing = dx > 0 ? "right" : "left";
-    } else if (!arrTimer.current) {
-      const pause = 400 + Math.random() * 1600;
-      arrTimer.current = setTimeout(() => {
-        arrTimer.current = null;
-        const ni = (st.wpIdx + 1) % WAYPOINTS.length;
-        const wp = WAYPOINTS[ni];
-        st.wpIdx = ni;
-        st.tx = Math.max(PAD, Math.min(W - PAD, (wp.x / 100) * W));
-        st.ty = Math.max(PAD, Math.min(H - PAD, (wp.y / 100) * H));
-        st.speed = 0.5 + wp.s * 1.4;
-        if (ni % 3 === 0 && !st.projecting) onProject(ni);
-      }, pause);
-    }
-
-    setPos({ x: st.x, y: st.y, bob: st.bob, facing: st.facing, projecting: st.projecting, imageUrl: st.imageUrl, imageLoaded: st.imageLoaded });
-    raf.current = requestAnimationFrame(tick);
-  }, [active, W, H, onProject, PAD]);
+  const next = useCallback(() => {
+    if (!active || W === 0) return;
+    const ni = (wpIdx.current + 1) % WAYPOINTS.length;
+    wpIdx.current = ni;
+    const wp = WAYPOINTS[ni];
+    const nx = Math.max(PAD, Math.min(W - PAD, (wp.x / 100) * W));
+    const ny = Math.max(PAD, Math.min(H - PAD, (wp.y / 100) * H));
+    // Vary speed: fast (1.8s) to slow (5s)
+    const speed = 1.8 + Math.random() * 3.2;
+    setDur(speed);
+    setPos({ x: nx, y: ny });
+    if (ni % 3 === 0 && !projecting.current) onProject(ni);
+    // Wait for transition to mostly finish, then pick next
+    const pause = speed * 1000 + 300 + Math.random() * 800;
+    timer.current = setTimeout(next, pause);
+  }, [active, W, H, PAD, onProject]);
 
   useEffect(() => {
-    if (!active) { if (raf.current) cancelAnimationFrame(raf.current); return; }
-    raf.current = requestAnimationFrame(tick);
-    return () => {
-      if (raf.current) cancelAnimationFrame(raf.current);
-      if (arrTimer.current) clearTimeout(arrTimer.current);
-      if (projTimer.current) clearTimeout(projTimer.current);
-    };
-  }, [active, tick]);
+    if (!active || W === 0) return;
+    // Start immediately at a random waypoint
+    const si = Math.floor(Math.random() * WAYPOINTS.length);
+    const sw = WAYPOINTS[si];
+    setPos({
+      x: Math.max(PAD, Math.min(W - PAD, (sw.x / 100) * W)),
+      y: Math.max(PAD, Math.min(H - PAD, (sw.y / 100) * H)),
+    });
+    wpIdx.current = si;
+    timer.current = setTimeout(next, 1200);
+    return () => { if (timer.current) clearTimeout(timer.current); };
+  }, [active, W, H, next, PAD]);
 
-  const triggerProjection = useCallback((url: string) => {
-    s.current.projecting = true;
-    s.current.imageUrl = url;
-    s.current.imageLoaded = false;
-  }, []);
-
-  const markLoaded = useCallback(() => {
-    s.current.imageLoaded = true;
-    projTimer.current = setTimeout(() => {
-      s.current.projecting = false;
-      s.current.imageUrl = null;
-      s.current.imageLoaded = false;
-    }, 6000);
-  }, []);
-
-  return { pos, triggerProjection, markLoaded };
+  return { pos, dur };
 }
 
-// ── SPHERE BOT — single glowing sphere with one eye ───────────────────────
-function SpherBot({ bob, isSpeaking, projecting, facing }: {
-  bob: number; isSpeaking: boolean; projecting: boolean; facing: "left" | "right";
-}) {
+// Bob — separate slow sine wave offset applied via CSS animation
+// ── SPHERE COMPONENT ──────────────────────────────────────────────────────
+function GhostSphere({ isSpeaking, blink }: { isSpeaking: boolean; blink: boolean }) {
   const D = SPHERE_R * 2;
   const R = SPHERE_R;
-  const glowColor = isSpeaking ? "rgba(99,102,241,1)" : "rgba(99,102,241,0.5)";
-  const glowSpread = isSpeaking ? 32 : 14;
-  const glowOuter = isSpeaking ? 60 : 24;
+
+  // Eyes: two white rounded rectangles; when blink=true they squish to a line
+  const eyeH = blink ? 3 : 20;
+  const eyeW = 14;
+  const eyeY = R - (blink ? 1.5 : 10); // vertical center stays same
+  const eyeLX = R - 20;
+  const eyeRX = R + 6;
 
   return (
-    <svg
-      width={D + 40} height={D + 40}
-      viewBox={`-20 -20 ${D + 40} ${D + 40}`}
-      fill="none"
+    <div
       style={{
-        transform: `translateY(${bob}px)`,
-        filter: `drop-shadow(0 0 ${glowSpread}px ${glowColor}) drop-shadow(0 0 ${glowOuter}px rgba(99,102,241,0.25))`,
-        transition: "filter 0.4s ease",
-        overflow: "visible",
+        width: D, height: D,
+        borderRadius: "50%",
+        background: "radial-gradient(circle at 38% 32%, #1a3a6e 0%, #0d1f4a 45%, #060d24 100%)",
+        boxShadow: isSpeaking
+          ? "0 0 30px 12px rgba(60,120,255,0.55), 0 0 70px 20px rgba(40,90,220,0.28), inset 0 0 30px rgba(80,140,255,0.12)"
+          : "0 0 18px 6px rgba(40,90,200,0.35), 0 0 50px 10px rgba(30,70,180,0.15), inset 0 0 20px rgba(60,110,220,0.08)",
+        transition: "box-shadow 0.5s ease",
+        position: "relative",
+        overflow: "hidden",
+        flexShrink: 0,
       }}
     >
-      {/* Outer pulse ring when speaking */}
-      {isSpeaking && (
-        <circle cx={R} cy={R} r={R + 14} fill="none" stroke="rgba(99,102,241,0.2)" strokeWidth="2">
-          <animate attributeName="r" values={`${R + 10};${R + 20};${R + 10}`} dur="1.6s" repeatCount="indefinite" />
-          <animate attributeName="opacity" values="0.4;0;0.4" dur="1.6s" repeatCount="indefinite" />
-        </circle>
-      )}
+      {/* Top specular highlight */}
+      <div style={{
+        position: "absolute", top: "12%", left: "22%",
+        width: "30%", height: "18%",
+        borderRadius: "50%",
+        background: "radial-gradient(circle, rgba(180,210,255,0.22) 0%, transparent 100%)",
+        pointerEvents: "none",
+      }} />
 
-      {/* Sphere base — dark with subtle gradient */}
-      <defs>
-        <radialGradient id="sphGrad" cx="38%" cy="32%" r="65%">
-          <stop offset="0%" stopColor="#2d2a6e"/>
-          <stop offset="60%" stopColor="#1a1740"/>
-          <stop offset="100%" stopColor="#0c0b28"/>
-        </radialGradient>
-        <radialGradient id="sphGlow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="rgba(99,102,241,0.15)"/>
-          <stop offset="100%" stopColor="rgba(99,102,241,0)"/>
-        </radialGradient>
-        <radialGradient id="eyeGrad" cx="40%" cy="35%" r="60%">
-          <stop offset="0%" stopColor={isSpeaking ? "#c7d2fe" : "#a5b4fc"}/>
-          <stop offset="100%" stopColor={isSpeaking ? "#6366f1" : "#4338ca"}/>
-        </radialGradient>
-      </defs>
-
-      {/* Shadow ellipse */}
-      <ellipse cx={R} cy={R * 2 + 6} rx={R * 0.65} ry={6} fill="rgba(0,0,0,0.35)" />
-
-      {/* Main sphere */}
-      <circle cx={R} cy={R} r={R} fill="url(#sphGrad)" stroke="#6366f1" strokeWidth="1.5" />
-      {/* Inner glow */}
-      <circle cx={R} cy={R} r={R} fill="url(#sphGlow)" />
-      {/* Highlight specular */}
-      <ellipse cx={R * 0.65} cy={R * 0.5} rx={R * 0.22} ry={R * 0.14} fill="rgba(255,255,255,0.18)" />
-
-      {/* THE EYE — big single eye centered, pupil tracks facing direction */}
-      {/* Eye white */}
-      <ellipse cx={R} cy={R} rx={R * 0.42} ry={R * 0.38} fill="rgba(230,235,255,0.95)" />
-      {/* Iris */}
-      <circle cx={R + (facing === "right" ? R * 0.06 : -R * 0.06)} cy={R} r={R * 0.26} fill="url(#eyeGrad)" />
-      {/* Pupil */}
-      <circle cx={R + (facing === "right" ? R * 0.08 : -R * 0.08)} cy={R} r={R * 0.13} fill="#0c0b28" />
-      {/* Eye glint */}
-      <circle cx={R + (facing === "right" ? R * 0.04 : -R * 0.04) - 4} cy={R - 5} r={R * 0.055} fill="white" opacity="0.9" />
-      {/* Eyelid top */}
-      <path d={`M ${R - R * 0.42} ${R} Q ${R} ${R - R * 0.52} ${R + R * 0.42} ${R}`} fill="#1a1740" />
-
-      {/* Speaking indicator: small animated dots on lower hemisphere */}
-      {isSpeaking && [0,1,2,3,4].map(i => {
-        const angle = (Math.PI * 0.35) + i * (Math.PI * 0.065);
-        const ex = R + Math.cos(angle) * R * 0.68;
-        const ey = R + Math.sin(angle) * R * 0.72;
-        return (
-          <circle key={i} cx={ex} cy={ey} r="3" fill="#a5b4fc" opacity="0.7">
-            <animate attributeName="r" values={`2;4;2`} dur="0.8s" begin={`${i * 0.12}s`} repeatCount="indefinite" />
-          </circle>
-        );
-      })}
-
-      {/* Projector beam nozzle on the side the sphere is facing */}
-      {projecting && (
-        <g transform={facing === "left" ? `scale(-1,1) translate(${-D},0)` : ""}>
-          <line x1={D} y1={R} x2={D + 12} y2={R} stroke="#a5b4fc" strokeWidth="2" strokeDasharray="4 3">
-            <animate attributeName="opacity" values="0.4;1;0.4" dur="1s" repeatCount="indefinite"/>
-          </line>
-          <ellipse cx={D + 16} cy={R} rx="5" ry="9" fill="#312e81" stroke="#a5b4fc" strokeWidth="1.5"/>
-          <circle cx={D + 16} cy={R} r="3" fill="#c7d2fe" opacity="0.9"/>
-        </g>
-      )}
-    </svg>
+      {/* SVG for eyes */}
+      <svg width={D} height={D} viewBox={`0 0 ${D} ${D}`} style={{ position: "absolute", inset: 0 }}>
+        {/* Left eye */}
+        <rect
+          x={eyeLX} y={eyeY}
+          width={eyeW} height={eyeH}
+          rx={eyeW / 2}
+          fill="white"
+          style={{ transition: "height 0.08s ease, y 0.08s ease" }}
+        />
+        {/* Right eye */}
+        <rect
+          x={eyeRX} y={eyeY}
+          width={eyeW} height={eyeH}
+          rx={eyeW / 2}
+          fill="white"
+          style={{ transition: "height 0.08s ease, y 0.08s ease" }}
+        />
+        {/* Speaking mouth dots */}
+        {isSpeaking && (
+          <>
+            <circle cx={R - 12} cy={R + 28} r="3" fill="rgba(150,190,255,0.6)">
+              <animate attributeName="r" values="2;4;2" dur="0.6s" repeatCount="indefinite" begin="0s"/>
+            </circle>
+            <circle cx={R} cy={R + 32} r="3" fill="rgba(150,190,255,0.6)">
+              <animate attributeName="r" values="2;4;2" dur="0.6s" repeatCount="indefinite" begin="0.1s"/>
+            </circle>
+            <circle cx={R + 12} cy={R + 28} r="3" fill="rgba(150,190,255,0.6)">
+              <animate attributeName="r" values="2;4;2" dur="0.6s" repeatCount="indefinite" begin="0.2s"/>
+            </circle>
+          </>
+        )}
+      </svg>
+    </div>
   );
 }
 
@@ -309,15 +243,18 @@ function VrClassroomPage() {
   const [elapsed, setElapsed] = useState(0);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [segCount, setSegCount] = useState(0);
+  const [blink, setBlink] = useState(false);
 
-  // The container must fill the full screen — measured after mount
+  // Projected image state
+  const [projImage, setProjImage] = useState<string | null>(null);
+  const [projLoaded, setProjLoaded] = useState(false);
+
   const [cSize, setCSize] = useState({ w: 0, h: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
-
-  // AudioContext is stored across renders — created once on the Enter button tap
   const audioCtxRef = useRef<AudioContext | null>(null);
-  const cleanupRef = useRef<(() => void) | null>(null);
+  const cleanupAudio = useRef<(() => void) | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const blinkTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const running = useRef(false);
   const sessionOn = useRef(false);
   const segRef = useRef(0);
@@ -326,60 +263,85 @@ function VrClassroomPage() {
   const timeLeft = durationMin * 60 - elapsed;
   const fmt = (s: number) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
-  // ── SPHERE ────────────────────────────────────────────────────────────────
-  const onProject = useCallback(async (idx: number) => {
-    if (!sessionOn.current) return;
-    const prompt = await getImagePrompt(selectedSubject?.label || "Science", selectedTopic, idx);
-    triggerProjection(buildImageUrl(prompt));
-  }, [selectedSubject, selectedTopic]);
+  // ── BLINK LOOP ────────────────────────────────────────────────────────────
+  const scheduleBlink = useCallback(() => {
+    const delay = 2500 + Math.random() * 4000;
+    blinkTimer.current = setTimeout(() => {
+      setBlink(true);
+      setTimeout(() => { setBlink(false); scheduleBlink(); }, 120);
+    }, delay);
+  }, []);
 
-  const { pos, triggerProjection, markLoaded } = useSphereAnimation(
-    phase === "session", cSize.w, cSize.h, onProject
-  );
+  useEffect(() => {
+    if (phase === "session") { scheduleBlink(); }
+    return () => { if (blinkTimer.current) clearTimeout(blinkTimer.current); };
+  }, [phase, scheduleBlink]);
 
-  // Measure container whenever phase changes (session mounts a new div)
+  // ── CONTAINER SIZE ────────────────────────────────────────────────────────
   useEffect(() => {
     if (phase !== "session") return;
     const measure = () => {
-      if (containerRef.current) {
-        const r = containerRef.current.getBoundingClientRect();
-        setCSize({ w: r.width || window.innerWidth, h: r.height || window.innerHeight });
+      const el = containerRef.current;
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        setCSize({ w: rect.width || window.innerWidth, h: rect.height || window.innerHeight });
       }
     };
+    // Measure right away and again after 300ms (after orientation rotation settles)
     measure();
+    const t = setTimeout(measure, 300);
     const ro = new ResizeObserver(measure);
     if (containerRef.current) ro.observe(containerRef.current);
     window.addEventListener("orientationchange", () => setTimeout(measure, 400));
-    return () => { ro.disconnect(); };
+    return () => { clearTimeout(t); ro.disconnect(); };
   }, [phase]);
 
+  // ── PROJECTION ────────────────────────────────────────────────────────────
+  const onProject = useCallback(async (idx: number) => {
+    if (!sessionOn.current) return;
+    const prompt = await getImagePrompt(selectedSubject?.label || "Science", selectedTopic, idx);
+    setProjImage(buildImageUrl(prompt));
+    setProjLoaded(false);
+    setTimeout(() => { setProjImage(null); }, 12000);
+  }, [selectedSubject, selectedTopic]);
+
+  const { pos, dur } = useSmoothFloat(phase === "session", cSize.w, cSize.h, onProject);
+
   // ── SPEAK ─────────────────────────────────────────────────────────────────
-  // Uses the pre-unlocked AudioContext stored in audioCtxRef
   const speak = useCallback(async (text: string, onDone: () => void) => {
-    cleanupRef.current?.();
+    cleanupAudio.current?.();
     const ctx = audioCtxRef.current;
     if (!ctx) { onDone(); return; }
     try {
       if (ctx.state === "suspended") await ctx.resume();
-      const b64 = await generateSpeech({ data: text, voiceId: PROFESSOR_VOICE_ID });
-      const { cleanup } = playBase64Audio(ctx, b64, onDone, () => {
-        // browser TTS fallback
+      console.log("[VR] calling Cartesia TTS, ctx state:", ctx.state);
+      const b64 = await generateSpeech({ data: text, voiceId: VOICE_ID });
+      console.log("[VR] got audio b64 length:", b64?.length);
+      const stop = playBase64Audio(ctx, b64, onDone, () => {
+        console.warn("[VR] Cartesia decode failed, falling back to browser TTS");
         if (window.speechSynthesis) {
+          window.speechSynthesis.cancel();
           const u = new SpeechSynthesisUtterance(text);
-          u.rate = 0.9;
+          u.rate = 0.88; u.pitch = 1.05;
           u.onend = onDone;
+          u.onerror = () => onDone();
           window.speechSynthesis.speak(u);
         } else onDone();
       });
-      cleanupRef.current = cleanup;
-    } catch { onDone(); }
+      cleanupAudio.current = stop;
+    } catch (e) {
+      console.error("[VR] speak error:", e);
+      onDone();
+    }
   }, [generateSpeech]);
 
   // ── SEGMENT LOOP ──────────────────────────────────────────────────────────
   const doSegment = useCallback(async () => {
     if (running.current || !sessionOn.current) return;
     running.current = true;
-    const text = await getLessonText(selectedSubject?.label || "Science", selectedTopic, historyRef.current);
+    const text = await getLessonText(
+      selectedSubject?.label || "Science", selectedTopic, historyRef.current
+    );
     if (!sessionOn.current) { running.current = false; return; }
     setIsSpeaking(true);
     speak(text, () => {
@@ -389,68 +351,67 @@ function VrClassroomPage() {
       segRef.current++;
       setSegCount(segRef.current);
       running.current = false;
-      setTimeout(() => { if (sessionOn.current) doSegment(); }, 1200);
+      setTimeout(() => { if (sessionOn.current) doSegment(); }, 1000);
     });
   }, [selectedSubject, selectedTopic, speak]);
 
-  // ── ENTER — called directly by button tap ─────────────────────────────────
+  // ── ENTER (must be called directly from tap) ───────────────────────────
   const startSession = useCallback(async () => {
-    // 1. Create and UNLOCK AudioContext inside the user gesture
-    const AC = (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext || window.AudioContext;
-    const ctx = new AC();
-    audioCtxRef.current = ctx;
-    // Calling resume() here while still inside the tap event
-    if (ctx.state === "suspended") {
-      await ctx.resume().catch(() => {});
-    }
+    // Create a fresh AudioContext INSIDE the user gesture — this is mandatory on mobile
+    try {
+      const AC = (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+        ?? window.AudioContext;
+      const ctx = new AC();
+      audioCtxRef.current = ctx;
+      // Resume while still inside the gesture callstack
+      if (ctx.state !== "running") await ctx.resume();
+      console.log("[VR] AudioContext created, state:", ctx.state);
+    } catch (e) { console.error("[VR] AudioContext init failed:", e); }
 
-    // 2. Reset state
     setElapsed(0);
     segRef.current = 0;
     historyRef.current = [];
     setSegCount(0);
     setIsSpeaking(false);
+    setProjImage(null);
     sessionOn.current = true;
-
-    // 3. Show loading briefly, then session
     setPhase("loading");
-    setTimeout(() => setPhase("session"), 1400);
+    setTimeout(() => setPhase("session"), 1200);
   }, []);
 
   // Timer
   useEffect(() => {
     if (phase !== "session") return;
-    timerRef.current = setInterval(() => setElapsed((e) => e + 1), 1000);
+    timerRef.current = setInterval(() => setElapsed(e => e + 1), 1000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [phase]);
 
-  // Kick off first segment once session + container are ready
+  // Start first segment once container is measured
   useEffect(() => {
     if (phase === "session" && cSize.w > 0 && segCount === 0 && !running.current) {
-      setTimeout(() => doSegment(), 600);
+      setTimeout(() => doSegment(), 500);
     }
   }, [phase, cSize.w, segCount, doSegment]);
 
-  // End when time runs out
+  // Time-out end
   useEffect(() => {
     if (phase === "session" && timeLeft <= 0) {
-      sessionOn.current = false;
-      cleanupRef.current?.();
-      setPhase("setup");
+      sessionOn.current = false; cleanupAudio.current?.(); setPhase("setup");
     }
   }, [phase, timeLeft]);
 
-  // Cleanup
+  // Cleanup on unmount
   useEffect(() => () => {
     sessionOn.current = false;
-    cleanupRef.current?.();
+    cleanupAudio.current?.();
     if (timerRef.current) clearInterval(timerRef.current);
+    if (blinkTimer.current) clearTimeout(blinkTimer.current);
     window.speechSynthesis?.cancel();
   }, []);
 
   const end = useCallback(() => {
     sessionOn.current = false;
-    cleanupRef.current?.();
+    cleanupAudio.current?.();
     window.speechSynthesis?.cancel();
     setPhase("setup");
   }, []);
@@ -458,25 +419,29 @@ function VrClassroomPage() {
   // ── SETUP ─────────────────────────────────────────────────────────────────
   if (phase === "setup") return (
     <div className="fixed inset-0 bg-[#050508] text-white flex flex-col overflow-hidden">
-      <div className="absolute inset-x-0 top-0 h-48 pointer-events-none" style={{ background: "radial-gradient(ellipse at 50% -10%, rgba(99,102,241,0.18) 0%, transparent 70%)" }} />
+      <div className="absolute inset-x-0 top-0 h-48 pointer-events-none"
+        style={{ background: "radial-gradient(ellipse at 50% -10%, rgba(60,120,255,0.15) 0%, transparent 70%)" }} />
       <header className="relative flex items-center px-5 pt-12 pb-5 flex-shrink-0">
-        <button onClick={() => navigate({ to: "/more" })} className="h-9 w-9 rounded-full bg-white/[0.06] flex items-center justify-center mr-4 hover:bg-white/10 active:scale-95 transition-all">
-          <svg className="h-4 w-4 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+        <button onClick={() => navigate({ to: "/more" })}
+          className="h-9 w-9 rounded-full bg-white/[0.06] flex items-center justify-center mr-4 hover:bg-white/10 active:scale-95 transition-all">
+          <svg className="h-4 w-4 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
         </button>
         <div className="flex-1">
           <h1 className="text-2xl font-bold tracking-tight">VR Classroom</h1>
-          <p className="text-xs text-white/35 mt-0.5">Floating AI sphere · Live voice · Real-time images</p>
+          <p className="text-xs text-white/30 mt-0.5">Floating AI · Live voice · Real-time images</p>
         </div>
-        <div className="flex items-center gap-1.5 bg-indigo-500/15 border border-indigo-500/25 rounded-full px-3 py-1.5">
-          <div className="h-1.5 w-1.5 bg-indigo-400 rounded-full animate-pulse" />
-          <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest">AI Live</span>
+        <div className="flex items-center gap-1.5 bg-blue-500/15 border border-blue-500/20 rounded-full px-3 py-1.5">
+          <div className="h-1.5 w-1.5 bg-blue-400 rounded-full animate-pulse" />
+          <span className="text-[10px] font-bold text-blue-300 uppercase tracking-widest">AI Live</span>
         </div>
       </header>
 
       <div className="flex-1 overflow-y-auto px-5 pb-10 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         <p className="text-[11px] font-semibold text-white/25 uppercase tracking-widest mb-4">Subject</p>
         <div className="grid grid-cols-2 gap-2.5 mb-8">
-          {SUBJECTS.map((subj) => (
+          {SUBJECTS.map(subj => (
             <button key={subj.id} onClick={() => { setSelectedSubject(subj); setSelectedTopic(""); }}
               className={`rounded-2xl p-4 text-left transition-all duration-200 active:scale-[0.97] border ${selectedSubject?.id === subj.id ? `bg-gradient-to-br ${subj.color} border-white/20` : "bg-white/[0.04] border-white/[0.05] hover:bg-white/[0.07]"}`}>
               <div className="text-2xl mb-2 leading-none">{subj.icon}</div>
@@ -489,7 +454,7 @@ function VrClassroomPage() {
           <div className="mb-8 animate-in fade-in slide-in-from-bottom-3 duration-300">
             <p className="text-[11px] font-semibold text-white/25 uppercase tracking-widest mb-4">Topic</p>
             <div className="flex flex-wrap gap-2">
-              {selectedSubject.topics.map((topic) => (
+              {selectedSubject.topics.map(topic => (
                 <button key={topic} onClick={() => setSelectedTopic(topic)}
                   className={`rounded-xl px-4 py-2.5 text-sm font-medium transition-all active:scale-95 ${selectedTopic === topic ? `bg-gradient-to-r ${selectedSubject.color} text-white` : "bg-white/[0.06] text-white/60 hover:bg-white/10 hover:text-white"}`}>
                   {topic}
@@ -503,21 +468,21 @@ function VrClassroomPage() {
           <div className="mb-8 animate-in fade-in slide-in-from-bottom-3 duration-300">
             <p className="text-[11px] font-semibold text-white/25 uppercase tracking-widest mb-4">Duration</p>
             <div className="flex gap-2">
-              {DURATION_OPTIONS.map((d) => (
+              {DURATION_OPTIONS.map(d => (
                 <button key={d} onClick={() => setDurationMin(d)}
                   className={`flex-1 rounded-xl py-3 text-sm font-bold transition-all active:scale-95 ${durationMin === d ? "bg-white text-black" : "bg-white/[0.05] text-white/50 hover:bg-white/10 hover:text-white"}`}>
                   {d}m
                 </button>
               ))}
             </div>
-            <p className="text-[11px] text-white/20 mt-2.5 text-center">Minimum 20 min · Full landscape</p>
+            <p className="text-[11px] text-white/20 mt-2.5 text-center">Minimum 20 min · Landscape fullscreen</p>
           </div>
         )}
 
         {selectedSubject && selectedTopic && (
           <button onClick={startSession}
             className={`w-full py-4 rounded-2xl font-bold text-base text-white transition-all active:scale-[0.98] bg-gradient-to-r ${selectedSubject.color}`}
-            style={{ boxShadow: "0 8px 32px rgba(99,102,241,0.35)" }}>
+            style={{ boxShadow: "0 8px 32px rgba(60,120,255,0.3)" }}>
             Enter VR Classroom · {durationMin} min
           </button>
         )}
@@ -527,13 +492,13 @@ function VrClassroomPage() {
 
   // ── LOADING ───────────────────────────────────────────────────────────────
   if (phase === "loading") return (
-    <div className="fixed inset-0 bg-black flex flex-col items-center justify-center gap-8 text-white">
-      <SpherBot bob={0} isSpeaking={true} projecting={false} facing="right" />
-      <div className="text-center">
-        <p className="text-base font-semibold text-white/70">{selectedSubject?.label} · {selectedTopic}</p>
-      </div>
+    <div className="fixed inset-0 bg-black flex flex-col items-center justify-center gap-10">
+      <GhostSphere isSpeaking={true} blink={false} />
       <div className="flex items-center gap-2">
-        {[0, 1, 2].map(i => <div key={i} className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />)}
+        {[0,1,2].map(i => (
+          <div key={i} className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-bounce"
+            style={{ animationDelay: `${i * 150}ms` }} />
+        ))}
       </div>
     </div>
   );
@@ -545,92 +510,87 @@ function VrClassroomPage() {
         @media screen and (orientation: portrait) {
           #vr-root {
             position: fixed;
-            top: 0; left: 0;
+            top: 0;
+            left: 100vw;
             width: 100vh !important;
             height: 100vw !important;
-            transform: rotate(90deg) translateX(0);
+            transform: rotate(90deg);
             transform-origin: top left;
-            left: 100vw;
             overflow: hidden;
           }
         }
         @media screen and (orientation: landscape) {
-          #vr-root {
-            position: fixed;
-            inset: 0;
-            width: 100vw;
-            height: 100dvh;
-          }
+          #vr-root { position: fixed; inset: 0; width: 100vw; height: 100dvh; }
         }
-        @keyframes imgIn { from { opacity:0; transform:scale(0.9); } to { opacity:1; transform:scale(1); } }
-        @keyframes beamBlink { 0%,100%{opacity:.3} 50%{opacity:.9} }
+        @keyframes bobFloat {
+          0%,100% { transform: translate(-50%,-50%) translateY(0px); }
+          50%      { transform: translate(-50%,-50%) translateY(-10px); }
+        }
+        @keyframes imgIn { from { opacity:0; transform:scale(0.88); } to { opacity:1; transform:scale(1); } }
       `}</style>
 
       <div id="vr-root" className="bg-black overflow-hidden" ref={containerRef}>
 
-        {/* Sphere bot */}
+        {/* Sphere + projection */}
         {cSize.w > 0 && (
-          <div className="absolute z-20 pointer-events-none"
-            style={{
-              left: pos.x,
-              top: pos.y + pos.bob,
-              transform: "translate(-50%, -50%)",
-              transition: "left 0.06s linear, top 0.06s linear",
-              willChange: "left, top",
-            }}
-          >
+          <div style={{
+            position: "absolute",
+            left: pos.x,
+            top: pos.y,
+            // CSS transition for smooth movement — duration comes from useSmoothFloat
+            transition: `left ${dur}s cubic-bezier(0.45,0.05,0.55,0.95), top ${dur}s cubic-bezier(0.45,0.05,0.55,0.95)`,
+            willChange: "left, top",
+            zIndex: 20,
+            pointerEvents: "none",
+          }}>
+            {/* Bob animation wrapper */}
+            <div style={{ animation: "bobFloat 3.2s ease-in-out infinite", display: "inline-block" }}>
+              <GhostSphere isSpeaking={isSpeaking} blink={blink} />
+            </div>
+
             {/* Projected image */}
-            {pos.projecting && pos.imageUrl && (
-              <div className="absolute z-10"
-                style={{
-                  [pos.facing === "right" ? "left" : "right"]: SPHERE_R * 2 + 30 + "px",
-                  top: -(SPHERE_R * 0.8) + "px",
-                  width: "200px",
-                  animation: "imgIn 0.5s ease forwards",
+            {projImage && (
+              <div style={{
+                position: "absolute",
+                left: SPHERE_R * 2 + 20,
+                top: -SPHERE_R * 0.6,
+                width: 200,
+                animation: "imgIn 0.5s ease forwards",
+                zIndex: 10,
+              }}>
+                <div style={{
+                  borderRadius: 16,
+                  overflow: "hidden",
+                  border: "1.5px solid rgba(100,160,255,0.3)",
+                  boxShadow: "0 0 30px rgba(60,120,255,0.4)",
+                  background: "#05091a",
                 }}>
-                <div className="absolute"
-                  style={{
-                    [pos.facing === "right" ? "right" : "left"]: "100%",
-                    top: "50%", width: "32px", height: "2px",
-                    transform: "translateY(-50%)",
-                    background: "linear-gradient(to right, transparent, rgba(165,180,252,0.6))",
-                    animation: "beamBlink 1s infinite",
-                  }}
-                />
-                <div className="rounded-2xl overflow-hidden" style={{ border: "1.5px solid rgba(165,180,252,0.3)", boxShadow: "0 0 30px rgba(99,102,241,0.45)", background: "#050510" }}>
-                  {!pos.imageLoaded && (
+                  {!projLoaded && (
                     <div className="flex items-center justify-center h-24">
-                      <div className="h-5 w-5 rounded-full border-2 border-indigo-400 border-t-transparent animate-spin" />
+                      <div className="h-5 w-5 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" />
                     </div>
                   )}
-                  <img src={pos.imageUrl} alt="" className="w-full h-auto block" style={{ maxHeight: "130px", objectFit: "cover", display: pos.imageLoaded ? "block" : "none" }} onLoad={markLoaded} onError={markLoaded} />
+                  <img src={projImage} alt="" style={{ width: "100%", maxHeight: 130, objectFit: "cover", display: projLoaded ? "block" : "none" }}
+                    onLoad={() => setProjLoaded(true)} onError={() => setProjLoaded(true)} />
                 </div>
               </div>
             )}
-
-            <SpherBot bob={0} isSpeaking={isSpeaking} projecting={pos.projecting} facing={pos.facing} />
           </div>
         )}
 
-        {/* Exit — tiny, bottom right */}
+        {/* Exit */}
         <button onClick={end} className="absolute bottom-5 right-5 z-50 h-9 w-9 rounded-full flex items-center justify-center active:scale-90 transition-all"
-          style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)" }}>
-          <svg className="h-4 w-4 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.09)" }}>
+          <svg className="h-4 w-4 text-white/35" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
 
-        {/* Timer — barely visible bottom-left */}
+        {/* Timer */}
         <div className="absolute bottom-5 left-5 z-50 font-mono text-[10px] tabular-nums select-none"
-          style={{ color: timeLeft < 300 ? "rgba(239,68,68,0.5)" : "rgba(255,255,255,0.18)" }}>
+          style={{ color: timeLeft < 300 ? "rgba(239,68,68,0.45)" : "rgba(255,255,255,0.15)" }}>
           {fmt(Math.max(0, timeLeft))}
         </div>
-
-        {/* Speaking glow line at very bottom */}
-        {isSpeaking && (
-          <div className="absolute bottom-0 left-0 right-0 h-px z-40"
-            style={{ background: "linear-gradient(to right, transparent, rgba(99,102,241,0.6), rgba(139,92,246,0.6), transparent)" }} />
-        )}
       </div>
     </>
   );
