@@ -4,7 +4,7 @@ import { Mic, MicOff, Video, PhoneOff } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import aiSphereImg from "@/assets/my-ai.png";
 
-export const generateSpeechFn = createServerFn("POST", async (text: string) => {
+export const generateSpeechFn = createServerFn("POST", async ({ data }: { data: string }) => {
   try {
     const fs = await import("fs/promises");
     const path = await import("path");
@@ -17,7 +17,7 @@ export const generateSpeechFn = createServerFn("POST", async (text: string) => {
     const tempAudioFile = path.join(process.cwd(), `temp_speech_${id}.mp3`);
 
     // Write text to file safely
-    await fs.writeFile(tempTextFile, text, "utf-8");
+    await fs.writeFile(tempTextFile, data, "utf-8");
 
     // Execute edge-tts CLI
     await execAsync(`edge-tts --file "${tempTextFile}" --write-media "${tempAudioFile}" --voice "en-US-BrianNeural"`);
