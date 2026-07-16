@@ -8,9 +8,10 @@ export const Route = createFileRoute("/vr-classroom")({
   component: VrClassroomPage,
 });
 
-// Skylar — approachable American female voice from Cartesia library
+// Skylar — Cartesia female voice
 const VOICE_ID = "db6b0ed5-d5d3-463d-ae85-518a07d3c2b4";
-const SPHERE_R = 70; // px radius
+const R = 55; // sphere radius in px
+const D = R * 2; // diameter
 
 // ── AUDIO ────────────────────────────────────────────────────────────────
 function playBase64Audio(
@@ -25,10 +26,8 @@ function playBase64Audio(
     const binary = atob(base64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    // Copy buffer so decodeAudioData owns it
-    const copy = bytes.buffer.slice(0);
     ctx.decodeAudioData(
-      copy,
+      bytes.buffer.slice(0),
       (buf) => {
         if (!active) return;
         source = ctx.createBufferSource();
@@ -37,13 +36,28 @@ function playBase64Audio(
         source.onended = () => { if (active) onEnded(); };
         source.start(0);
       },
-      (e) => { console.error("decode error", e); if (active) onError(); }
+      () => { if (active) onError(); }
     );
-  } catch (e) { console.error("playback error", e); if (active) onError(); }
+  } catch { if (active) onError(); }
   return () => {
     active = false;
     if (source) { try { source.stop(); } catch (_) {} }
   };
+}
+
+// Browser TTS fallback
+function speakBrowser(text: string, onDone: () => void) {
+  if (!window.speechSynthesis) { onDone(); return; }
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.rate = 1.05; u.pitch = 1.1; u.volume = 1;
+  // Pick a female voice if available
+  const voices = window.speechSynthesis.getVoices();
+  const female = voices.find(v => /female|woman|girl|zira|samantha|karen|moira|tessa|fiona/i.test(v.name));
+  if (female) u.voice = female;
+  u.onend = onDone;
+  u.onerror = () => onDone();
+  window.speechSynthesis.speak(u);
 }
 
 // ── SUBJECTS ─────────────────────────────────────────────────────────────
@@ -71,163 +85,163 @@ async function getLessonText(
       body: JSON.stringify({
         model: "llama-3.3-70b-versatile",
         messages: [
-          { role: "system", content: `You are a brilliant AI professor teaching ${subject} — topic: "${topic}". Speak in 3–4 vivid, flowing sentences. Progress naturally. Use real-world analogies. No markdown, no lists.` },
+          {
+            role: "system",
+            content: `You are Zuri, a super cheerful, bubbly, energetic AI teacher teaching ${subject} about "${topic}". You love learning and get genuinely excited about ideas! Speak in 2–3 short, lively, upbeat sentences. Use exclamations, fun comparisons, real-world analogies. Sound warm, encouraging, and playful — like the most fun teacher ever. No markdown, no lists.`,
+          },
           ...history,
-          { role: "user", content: "Continue the lecture." },
+          { role: "user", content: "Teach me the next part!" },
         ],
-        max_tokens: 160, temperature: 0.75,
+        max_tokens: 130, temperature: 0.85,
       }),
     });
     const d = await res.json();
-    return d.choices?.[0]?.message?.content?.trim() || "Let us continue exploring this fascinating topic...";
-  } catch { return "Let us continue exploring this fascinating topic..."; }
+    return d.choices?.[0]?.message?.content?.trim() || "Oh this is SO fascinating — let's keep going!";
+  } catch { return "Oh this is SO fascinating — let's keep going!"; }
 }
 
-async function getImagePrompt(subject: string, topic: string, seg: number): Promise<string> {
+// Generate image prompt AND preload image, return url when loaded
+async function prepareImage(subject: string, topic: string, seg: number): Promise<string> {
+  let prompt = `${topic} educational diagram`;
   try {
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_GROQ_API_KEY}` },
       body: JSON.stringify({
         model: "llama-3.3-70b-versatile",
-        messages: [{ role: "system", content: `Image generation prompt for ${subject} concept "${topic}" (segment ${seg}). Visual, educational, beautiful. Under 18 words. No quotes.` }],
-        max_tokens: 40, temperature: 0.8,
+        messages: [{ role: "system", content: `Short Stable Diffusion prompt for a ${subject} visual about "${topic}" segment ${seg}. Max 12 words. No quotes.` }],
+        max_tokens: 30, temperature: 0.7,
       }),
     });
     const d = await res.json();
-    return d.choices?.[0]?.message?.content?.trim() || `${topic} concept`;
-  } catch { return `${topic} educational art`; }
+    prompt = d.choices?.[0]?.message?.content?.trim() || prompt;
+  } catch { /* keep default */ }
+
+  const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt + ", vibrant, dark background, 4k")}?width=480&height=300&nologo=true&seed=${seg}`;
+
+  // Preload: fetch as blob so it's cached before we show it
+  try {
+    await fetch(url, { mode: "no-cors" });
+  } catch { /* ignore, img tag will try anyway */ }
+
+  return url;
 }
 
-const buildImageUrl = (p: string) =>
-  `https://image.pollinations.ai/prompt/${encodeURIComponent(p + ", dark background, vibrant colors")}?width=480&height=300&nologo=true`;
-
-// ── SPHERE FLOAT ANIMATION (CSS-based, smooth) ────────────────────────────
-// We drive position entirely with CSS transitions + a slow interval
-// so the movement is butter-smooth without a RAF loop eating frames.
-const WAYPOINTS = [
-  { x: 22, y: 30 }, { x: 55, y: 20 }, { x: 78, y: 38 },
-  { x: 68, y: 65 }, { x: 38, y: 72 }, { x: 18, y: 55 },
-  { x: 45, y: 42 }, { x: 72, y: 25 }, { x: 50, y: 68 },
-  { x: 25, y: 40 },
+// ── WAYPOINTS — stays well inside bounds ─────────────────────────────────
+// Positions are % of container. Bot size = D px, so PAD = D/2 from edge.
+const WPS = [
+  { x: 25, y: 30 }, { x: 60, y: 22 }, { x: 78, y: 45 },
+  { x: 65, y: 68 }, { x: 35, y: 72 }, { x: 18, y: 52 },
+  { x: 48, y: 38 }, { x: 74, y: 28 }, { x: 52, y: 65 },
+  { x: 22, y: 42 },
 ];
 
-function useSmoothFloat(
-  active: boolean, W: number, H: number,
-  onProject: (idx: number) => void
-) {
-  const PAD = SPHERE_R + 10;
-  const [pos, setPos] = useState({ x: W * 0.5, y: H * 0.5 });
-  const [dur, setDur] = useState(3.5); // CSS transition duration in seconds
+// ── FLOAT HOOK ────────────────────────────────────────────────────────────
+function useFloat(active: boolean, W: number, H: number) {
+  const PAD = R + 4; // keep sphere fully inside
+  const [pos, setPos] = useState({ x: W * 0.5 - R, y: H * 0.5 - R });
+  const [moveDur, setMoveDur] = useState("1.2s");
   const wpIdx = useRef(0);
-  const projecting = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const next = useCallback(() => {
+  const goNext = useCallback(() => {
     if (!active || W === 0) return;
-    const ni = (wpIdx.current + 1) % WAYPOINTS.length;
+    const ni = (wpIdx.current + 1) % WPS.length;
     wpIdx.current = ni;
-    const wp = WAYPOINTS[ni];
-    const nx = Math.max(PAD, Math.min(W - PAD, (wp.x / 100) * W));
-    const ny = Math.max(PAD, Math.min(H - PAD, (wp.y / 100) * H));
-    // Vary speed: fast (1.8s) to slow (5s)
-    const speed = 1.8 + Math.random() * 3.2;
-    setDur(speed);
+    const wp = WPS[ni];
+    // top-left corner of the sphere div
+    const nx = Math.max(PAD, Math.min(W - PAD - D, (wp.x / 100) * W));
+    const ny = Math.max(PAD, Math.min(H - PAD - D, (wp.y / 100) * H));
+
+    // random speed: 0.5s (fast dash) to 1.4s (gentle glide)
+    const speed = 0.5 + Math.random() * 0.9;
+    setMoveDur(`${speed.toFixed(2)}s`);
     setPos({ x: nx, y: ny });
-    if (ni % 3 === 0 && !projecting.current) onProject(ni);
-    // Wait for transition to mostly finish, then pick next
-    const pause = speed * 1000 + 300 + Math.random() * 800;
-    timer.current = setTimeout(next, pause);
-  }, [active, W, H, PAD, onProject]);
+
+    // stop at waypoint for 0.6–2.5s then move again
+    const stop = 600 + Math.random() * 1900;
+    timer.current = setTimeout(goNext, speed * 1000 + stop);
+  }, [active, W, H, PAD]);
 
   useEffect(() => {
     if (!active || W === 0) return;
-    // Start immediately at a random waypoint
-    const si = Math.floor(Math.random() * WAYPOINTS.length);
-    const sw = WAYPOINTS[si];
-    setPos({
-      x: Math.max(PAD, Math.min(W - PAD, (sw.x / 100) * W)),
-      y: Math.max(PAD, Math.min(H - PAD, (sw.y / 100) * H)),
-    });
-    wpIdx.current = si;
-    timer.current = setTimeout(next, 1200);
+    // Start at a safe initial position
+    setPos({ x: Math.max(PAD, W * 0.5 - R), y: Math.max(PAD, H * 0.5 - R) });
+    timer.current = setTimeout(goNext, 600);
     return () => { if (timer.current) clearTimeout(timer.current); };
-  }, [active, W, H, next, PAD]);
+  }, [active, W, H, goNext, PAD]);
 
-  return { pos, dur };
+  return { pos, moveDur };
 }
 
-// Bob — separate slow sine wave offset applied via CSS animation
-// ── SPHERE COMPONENT ──────────────────────────────────────────────────────
-function GhostSphere({ isSpeaking, blink }: { isSpeaking: boolean; blink: boolean }) {
-  const D = SPHERE_R * 2;
-  const R = SPHERE_R;
-
-  // Eyes: two white rounded rectangles; when blink=true they squish to a line
-  const eyeH = blink ? 3 : 20;
-  const eyeW = 14;
-  const eyeY = R - (blink ? 1.5 : 10); // vertical center stays same
-  const eyeLX = R - 20;
-  const eyeRX = R + 6;
+// ── SPHERE SVG — dark matte, two blinking white eyes ──────────────────────
+function Sphere({ isSpeaking, blink }: { isSpeaking: boolean; blink: boolean }) {
+  const eyeH = blink ? 2 : 16;
+  const eyeRx = 5;
+  // Eye centers at 40% and 60% of diameter horizontally, 48% vertically
+  const eyeLx = D * 0.33;
+  const eyeRx2 = D * 0.57;
+  const eyeY = D * 0.46;
 
   return (
-    <div
-      style={{
-        width: D, height: D,
-        borderRadius: "50%",
-        background: "radial-gradient(circle at 38% 32%, #1a3a6e 0%, #0d1f4a 45%, #060d24 100%)",
-        boxShadow: isSpeaking
-          ? "0 0 30px 12px rgba(60,120,255,0.55), 0 0 70px 20px rgba(40,90,220,0.28), inset 0 0 30px rgba(80,140,255,0.12)"
-          : "0 0 18px 6px rgba(40,90,200,0.35), 0 0 50px 10px rgba(30,70,180,0.15), inset 0 0 20px rgba(60,110,220,0.08)",
-        transition: "box-shadow 0.5s ease",
-        position: "relative",
-        overflow: "hidden",
-        flexShrink: 0,
-      }}
+    <svg
+      width={D} height={D}
+      viewBox={`0 0 ${D} ${D}`}
+      style={{ display: "block", overflow: "visible" }}
     >
-      {/* Top specular highlight */}
-      <div style={{
-        position: "absolute", top: "12%", left: "22%",
-        width: "30%", height: "18%",
-        borderRadius: "50%",
-        background: "radial-gradient(circle, rgba(180,210,255,0.22) 0%, transparent 100%)",
-        pointerEvents: "none",
-      }} />
+      <defs>
+        {/* Dark matte sphere — very dark charcoal, no glow */}
+        <radialGradient id="sg" cx="38%" cy="30%" r="70%">
+          <stop offset="0%" stopColor="#2a2a2a"/>
+          <stop offset="55%" stopColor="#181818"/>
+          <stop offset="100%" stopColor="#0a0a0a"/>
+        </radialGradient>
+      </defs>
 
-      {/* SVG for eyes */}
-      <svg width={D} height={D} viewBox={`0 0 ${D} ${D}`} style={{ position: "absolute", inset: 0 }}>
-        {/* Left eye */}
-        <rect
-          x={eyeLX} y={eyeY}
-          width={eyeW} height={eyeH}
-          rx={eyeW / 2}
-          fill="white"
-          style={{ transition: "height 0.08s ease, y 0.08s ease" }}
-        />
-        {/* Right eye */}
-        <rect
-          x={eyeRX} y={eyeY}
-          width={eyeW} height={eyeH}
-          rx={eyeW / 2}
-          fill="white"
-          style={{ transition: "height 0.08s ease, y 0.08s ease" }}
-        />
-        {/* Speaking mouth dots */}
-        {isSpeaking && (
-          <>
-            <circle cx={R - 12} cy={R + 28} r="3" fill="rgba(150,190,255,0.6)">
-              <animate attributeName="r" values="2;4;2" dur="0.6s" repeatCount="indefinite" begin="0s"/>
-            </circle>
-            <circle cx={R} cy={R + 32} r="3" fill="rgba(150,190,255,0.6)">
-              <animate attributeName="r" values="2;4;2" dur="0.6s" repeatCount="indefinite" begin="0.1s"/>
-            </circle>
-            <circle cx={R + 12} cy={R + 28} r="3" fill="rgba(150,190,255,0.6)">
-              <animate attributeName="r" values="2;4;2" dur="0.6s" repeatCount="indefinite" begin="0.2s"/>
-            </circle>
-          </>
-        )}
-      </svg>
-    </div>
+      {/* Shadow */}
+      <ellipse cx={R} cy={D - 4} rx={R * 0.6} ry={5} fill="rgba(0,0,0,0.4)"/>
+
+      {/* Main sphere — dark matte, no box-shadow */}
+      <circle cx={R} cy={R} r={R - 1} fill="url(#sg)"/>
+
+      {/* Subtle specular top-left */}
+      <ellipse cx={R * 0.62} cy={R * 0.52} rx={R * 0.18} ry={R * 0.12}
+        fill="rgba(255,255,255,0.07)"/>
+
+      {/* LEFT EYE */}
+      <rect
+        x={eyeLx - eyeRx}
+        y={eyeY - eyeH / 2}
+        width={eyeRx * 2}
+        height={eyeH}
+        rx={eyeRx}
+        fill="white"
+      />
+      {/* RIGHT EYE */}
+      <rect
+        x={eyeRx2 - eyeRx}
+        y={eyeY - eyeH / 2}
+        width={eyeRx * 2}
+        height={eyeH}
+        rx={eyeRx}
+        fill="white"
+      />
+
+      {/* Subtle mouth bounce when speaking */}
+      {isSpeaking && (
+        <>
+          <circle cx={R - 8} cy={R + R * 0.4} r="2.5" fill="rgba(255,255,255,0.35)">
+            <animate attributeName="cy" values={`${R + R * 0.38};${R + R * 0.44};${R + R * 0.38}`} dur="0.5s" repeatCount="indefinite"/>
+          </circle>
+          <circle cx={R} cy={R + R * 0.44} r="2.5" fill="rgba(255,255,255,0.35)">
+            <animate attributeName="cy" values={`${R + R * 0.44};${R + R * 0.38};${R + R * 0.44}`} dur="0.5s" repeatCount="indefinite"/>
+          </circle>
+          <circle cx={R + 8} cy={R + R * 0.4} r="2.5" fill="rgba(255,255,255,0.35)">
+            <animate attributeName="cy" values={`${R + R * 0.38};${R + R * 0.44};${R + R * 0.38}`} dur="0.5s" repeatCount="indefinite" begin="0.1s"/>
+          </circle>
+        </>
+      )}
+    </svg>
   );
 }
 
@@ -244,13 +258,13 @@ function VrClassroomPage() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [segCount, setSegCount] = useState(0);
   const [blink, setBlink] = useState(false);
-
-  // Projected image state
   const [projImage, setProjImage] = useState<string | null>(null);
-  const [projLoaded, setProjLoaded] = useState(false);
+  const [projVisible, setProjVisible] = useState(false);
 
-  const [cSize, setCSize] = useState({ w: 0, h: 0 });
+  const [cW, setCW] = useState(0);
+  const [cH, setCH] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+
   const audioCtxRef = useRef<AudioContext | null>(null);
   const cleanupAudio = useRef<(() => void) | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -259,148 +273,154 @@ function VrClassroomPage() {
   const sessionOn = useRef(false);
   const segRef = useRef(0);
   const historyRef = useRef<{ role: string; content: string }[]>([]);
+  const nextImageUrl = useRef<string | null>(null); // pre-loaded
 
   const timeLeft = durationMin * 60 - elapsed;
   const fmt = (s: number) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
-  // ── BLINK LOOP ────────────────────────────────────────────────────────────
-  const scheduleBlink = useCallback(() => {
-    const delay = 2500 + Math.random() * 4000;
-    blinkTimer.current = setTimeout(() => {
-      setBlink(true);
-      setTimeout(() => { setBlink(false); scheduleBlink(); }, 120);
-    }, delay);
+  // ── BLINK ─────────────────────────────────────────────────────────────────
+  const doBlink = useCallback(() => {
+    setBlink(true);
+    setTimeout(() => {
+      setBlink(false);
+      blinkTimer.current = setTimeout(doBlink, 2000 + Math.random() * 4000);
+    }, 110);
   }, []);
 
   useEffect(() => {
-    if (phase === "session") { scheduleBlink(); }
+    if (phase !== "session") return;
+    blinkTimer.current = setTimeout(doBlink, 1000);
     return () => { if (blinkTimer.current) clearTimeout(blinkTimer.current); };
-  }, [phase, scheduleBlink]);
+  }, [phase, doBlink]);
 
   // ── CONTAINER SIZE ────────────────────────────────────────────────────────
   useEffect(() => {
     if (phase !== "session") return;
     const measure = () => {
       const el = containerRef.current;
-      if (el) {
-        const rect = el.getBoundingClientRect();
-        setCSize({ w: rect.width || window.innerWidth, h: rect.height || window.innerHeight });
-      }
+      if (!el) return;
+      // Use window dimensions as fallback — more reliable on mobile
+      setCW(el.offsetWidth || window.innerWidth);
+      setCH(el.offsetHeight || window.innerHeight);
     };
-    // Measure right away and again after 300ms (after orientation rotation settles)
     measure();
-    const t = setTimeout(measure, 300);
+    setTimeout(measure, 200);
+    setTimeout(measure, 600);
     const ro = new ResizeObserver(measure);
     if (containerRef.current) ro.observe(containerRef.current);
-    window.addEventListener("orientationchange", () => setTimeout(measure, 400));
-    return () => { clearTimeout(t); ro.disconnect(); };
+    return () => ro.disconnect();
   }, [phase]);
 
-  // ── PROJECTION ────────────────────────────────────────────────────────────
-  const onProject = useCallback(async (idx: number) => {
-    if (!sessionOn.current) return;
-    const prompt = await getImagePrompt(selectedSubject?.label || "Science", selectedTopic, idx);
-    setProjImage(buildImageUrl(prompt));
-    setProjLoaded(false);
-    setTimeout(() => { setProjImage(null); }, 12000);
-  }, [selectedSubject, selectedTopic]);
-
-  const { pos, dur } = useSmoothFloat(phase === "session", cSize.w, cSize.h, onProject);
+  const { pos, moveDur } = useFloat(phase === "session" && cW > 0, cW, cH);
 
   // ── SPEAK ─────────────────────────────────────────────────────────────────
   const speak = useCallback(async (text: string, onDone: () => void) => {
     cleanupAudio.current?.();
     const ctx = audioCtxRef.current;
-    if (!ctx) { onDone(); return; }
-    try {
-      if (ctx.state === "suspended") await ctx.resume();
-      console.log("[VR] calling Cartesia TTS, ctx state:", ctx.state);
-      const b64 = await generateSpeech({ data: text, voiceId: VOICE_ID });
-      console.log("[VR] got audio b64 length:", b64?.length);
-      const stop = playBase64Audio(ctx, b64, onDone, () => {
-        console.warn("[VR] Cartesia decode failed, falling back to browser TTS");
-        if (window.speechSynthesis) {
-          window.speechSynthesis.cancel();
-          const u = new SpeechSynthesisUtterance(text);
-          u.rate = 0.88; u.pitch = 1.05;
-          u.onend = onDone;
-          u.onerror = () => onDone();
-          window.speechSynthesis.speak(u);
-        } else onDone();
-      });
-      cleanupAudio.current = stop;
-    } catch (e) {
-      console.error("[VR] speak error:", e);
-      onDone();
+
+    // Try Cartesia first if ctx is available
+    if (ctx) {
+      try {
+        if (ctx.state === "suspended") await ctx.resume();
+        const b64 = await generateSpeech({ data: text, voiceId: VOICE_ID });
+        if (b64 && b64.length > 100) {
+          const stop = playBase64Audio(ctx, b64, onDone, () => speakBrowser(text, onDone));
+          cleanupAudio.current = stop;
+          return;
+        }
+      } catch (e) {
+        console.warn("[VR] Cartesia failed, using browser TTS", e);
+      }
     }
+
+    // Always-available fallback
+    speakBrowser(text, onDone);
   }, [generateSpeech]);
 
   // ── SEGMENT LOOP ──────────────────────────────────────────────────────────
   const doSegment = useCallback(async () => {
     if (running.current || !sessionOn.current) return;
     running.current = true;
-    const text = await getLessonText(
-      selectedSubject?.label || "Science", selectedTopic, historyRef.current
-    );
+
+    const subj = selectedSubject?.label || "Science";
+
+    // Pre-fetch the NEXT image in background while speaking current segment
+    const imagePromise = prepareImage(subj, selectedTopic, segRef.current + 1);
+
+    // Show the already-preloaded image from previous cycle (if any)
+    if (nextImageUrl.current) {
+      setProjImage(nextImageUrl.current);
+      setProjVisible(true);
+      setTimeout(() => setProjVisible(false), 10000);
+    }
+
+    const text = await getLessonText(subj, selectedTopic, historyRef.current);
     if (!sessionOn.current) { running.current = false; return; }
+
     setIsSpeaking(true);
-    speak(text, () => {
+    speak(text, async () => {
       if (!sessionOn.current) return;
       setIsSpeaking(false);
       historyRef.current = [...historyRef.current.slice(-10), { role: "assistant", content: text }];
       segRef.current++;
       setSegCount(segRef.current);
       running.current = false;
-      setTimeout(() => { if (sessionOn.current) doSegment(); }, 1000);
+
+      // Store the image that was pre-loaded during speech — show on next segment
+      nextImageUrl.current = await imagePromise;
+
+      setTimeout(() => { if (sessionOn.current) doSegment(); }, 800);
     });
   }, [selectedSubject, selectedTopic, speak]);
 
-  // ── ENTER (must be called directly from tap) ───────────────────────────
+  // ── ENTER ─────────────────────────────────────────────────────────────────
   const startSession = useCallback(async () => {
-    // Create a fresh AudioContext INSIDE the user gesture — this is mandatory on mobile
+    // Create + unlock AudioContext INSIDE the user gesture
     try {
       const AC = (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
         ?? window.AudioContext;
       const ctx = new AC();
+      // Must call resume() synchronously from the gesture — before any await
+      const resumePromise = ctx.resume();
       audioCtxRef.current = ctx;
-      // Resume while still inside the gesture callstack
-      if (ctx.state !== "running") await ctx.resume();
-      console.log("[VR] AudioContext created, state:", ctx.state);
-    } catch (e) { console.error("[VR] AudioContext init failed:", e); }
+      await resumePromise;
+    } catch (e) { console.warn("[VR] AudioContext error:", e); }
 
     setElapsed(0);
     segRef.current = 0;
     historyRef.current = [];
+    nextImageUrl.current = null;
     setSegCount(0);
     setIsSpeaking(false);
     setProjImage(null);
+    setProjVisible(false);
     sessionOn.current = true;
     setPhase("loading");
-    setTimeout(() => setPhase("session"), 1200);
+    setTimeout(() => setPhase("session"), 1000);
   }, []);
 
-  // Timer
   useEffect(() => {
     if (phase !== "session") return;
     timerRef.current = setInterval(() => setElapsed(e => e + 1), 1000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [phase]);
 
-  // Start first segment once container is measured
   useEffect(() => {
-    if (phase === "session" && cSize.w > 0 && segCount === 0 && !running.current) {
-      setTimeout(() => doSegment(), 500);
+    if (phase === "session" && cW > 0 && segCount === 0 && !running.current) {
+      // Preload first image before we start talking
+      prepareImage(selectedSubject?.label || "Science", selectedTopic, 0).then(url => {
+        nextImageUrl.current = url;
+      });
+      setTimeout(() => doSegment(), 400);
     }
-  }, [phase, cSize.w, segCount, doSegment]);
+  }, [phase, cW, segCount, doSegment, selectedSubject, selectedTopic]);
 
-  // Time-out end
   useEffect(() => {
     if (phase === "session" && timeLeft <= 0) {
       sessionOn.current = false; cleanupAudio.current?.(); setPhase("setup");
     }
   }, [phase, timeLeft]);
 
-  // Cleanup on unmount
   useEffect(() => () => {
     sessionOn.current = false;
     cleanupAudio.current?.();
@@ -418,23 +438,17 @@ function VrClassroomPage() {
 
   // ── SETUP ─────────────────────────────────────────────────────────────────
   if (phase === "setup") return (
-    <div className="fixed inset-0 bg-[#050508] text-white flex flex-col overflow-hidden">
-      <div className="absolute inset-x-0 top-0 h-48 pointer-events-none"
-        style={{ background: "radial-gradient(ellipse at 50% -10%, rgba(60,120,255,0.15) 0%, transparent 70%)" }} />
-      <header className="relative flex items-center px-5 pt-12 pb-5 flex-shrink-0">
+    <div className="fixed inset-0 bg-[#060609] text-white flex flex-col overflow-hidden">
+      <header className="flex items-center px-5 pt-12 pb-5 flex-shrink-0">
         <button onClick={() => navigate({ to: "/more" })}
           className="h-9 w-9 rounded-full bg-white/[0.06] flex items-center justify-center mr-4 hover:bg-white/10 active:scale-95 transition-all">
           <svg className="h-4 w-4 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
           </svg>
         </button>
         <div className="flex-1">
           <h1 className="text-2xl font-bold tracking-tight">VR Classroom</h1>
-          <p className="text-xs text-white/30 mt-0.5">Floating AI · Live voice · Real-time images</p>
-        </div>
-        <div className="flex items-center gap-1.5 bg-blue-500/15 border border-blue-500/20 rounded-full px-3 py-1.5">
-          <div className="h-1.5 w-1.5 bg-blue-400 rounded-full animate-pulse" />
-          <span className="text-[10px] font-bold text-blue-300 uppercase tracking-widest">AI Live</span>
+          <p className="text-xs text-white/30 mt-0.5">Live AI · Voice · Images</p>
         </div>
       </header>
 
@@ -451,7 +465,7 @@ function VrClassroomPage() {
         </div>
 
         {selectedSubject && (
-          <div className="mb-8 animate-in fade-in slide-in-from-bottom-3 duration-300">
+          <div className="mb-8 animate-in fade-in duration-300">
             <p className="text-[11px] font-semibold text-white/25 uppercase tracking-widest mb-4">Topic</p>
             <div className="flex flex-wrap gap-2">
               {selectedSubject.topics.map(topic => (
@@ -465,7 +479,7 @@ function VrClassroomPage() {
         )}
 
         {selectedTopic && (
-          <div className="mb-8 animate-in fade-in slide-in-from-bottom-3 duration-300">
+          <div className="mb-8 animate-in fade-in duration-300">
             <p className="text-[11px] font-semibold text-white/25 uppercase tracking-widest mb-4">Duration</p>
             <div className="flex gap-2">
               {DURATION_OPTIONS.map(d => (
@@ -475,14 +489,13 @@ function VrClassroomPage() {
                 </button>
               ))}
             </div>
-            <p className="text-[11px] text-white/20 mt-2.5 text-center">Minimum 20 min · Landscape fullscreen</p>
+            <p className="text-[11px] text-white/18 mt-2.5 text-center">Min 20 min · Landscape fullscreen</p>
           </div>
         )}
 
         {selectedSubject && selectedTopic && (
           <button onClick={startSession}
-            className={`w-full py-4 rounded-2xl font-bold text-base text-white transition-all active:scale-[0.98] bg-gradient-to-r ${selectedSubject.color}`}
-            style={{ boxShadow: "0 8px 32px rgba(60,120,255,0.3)" }}>
+            className={`w-full py-4 rounded-2xl font-bold text-base text-white transition-all active:scale-[0.98] bg-gradient-to-r ${selectedSubject.color}`}>
             Enter VR Classroom · {durationMin} min
           </button>
         )}
@@ -492,14 +505,8 @@ function VrClassroomPage() {
 
   // ── LOADING ───────────────────────────────────────────────────────────────
   if (phase === "loading") return (
-    <div className="fixed inset-0 bg-black flex flex-col items-center justify-center gap-10">
-      <GhostSphere isSpeaking={true} blink={false} />
-      <div className="flex items-center gap-2">
-        {[0,1,2].map(i => (
-          <div key={i} className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-bounce"
-            style={{ animationDelay: `${i * 150}ms` }} />
-        ))}
-      </div>
+    <div className="fixed inset-0 bg-black flex items-center justify-center">
+      <Sphere isSpeaking={false} blink={false}/>
     </div>
   );
 
@@ -509,86 +516,90 @@ function VrClassroomPage() {
       <style>{`
         @media screen and (orientation: portrait) {
           #vr-root {
-            position: fixed;
-            top: 0;
-            left: 100vw;
+            position: fixed !important;
+            top: 0 !important;
+            left: 100vw !important;
             width: 100vh !important;
             height: 100vw !important;
-            transform: rotate(90deg);
-            transform-origin: top left;
-            overflow: hidden;
+            transform: rotate(90deg) !important;
+            transform-origin: top left !important;
+            overflow: hidden !important;
           }
         }
         @media screen and (orientation: landscape) {
-          #vr-root { position: fixed; inset: 0; width: 100vw; height: 100dvh; }
+          #vr-root {
+            position: fixed !important;
+            inset: 0 !important;
+            width: 100vw !important;
+            height: 100dvh !important;
+          }
         }
-        @keyframes bobFloat {
-          0%,100% { transform: translate(-50%,-50%) translateY(0px); }
-          50%      { transform: translate(-50%,-50%) translateY(-10px); }
+        @keyframes bob {
+          0%,100% { transform: translateY(0); }
+          50%      { transform: translateY(-8px); }
         }
-        @keyframes imgIn { from { opacity:0; transform:scale(0.88); } to { opacity:1; transform:scale(1); } }
+        @keyframes imgPop {
+          from { opacity: 0; transform: scale(0.85); }
+          to   { opacity: 1; transform: scale(1); }
+        }
       `}</style>
 
-      <div id="vr-root" className="bg-black overflow-hidden" ref={containerRef}>
+      <div id="vr-root" style={{ background: "#000" }} ref={containerRef}>
 
-        {/* Sphere + projection */}
-        {cSize.w > 0 && (
+        {/* Bot + image */}
+        {cW > 0 && (
           <div style={{
             position: "absolute",
             left: pos.x,
             top: pos.y,
-            // CSS transition for smooth movement — duration comes from useSmoothFloat
-            transition: `left ${dur}s cubic-bezier(0.45,0.05,0.55,0.95), top ${dur}s cubic-bezier(0.45,0.05,0.55,0.95)`,
+            width: D,
+            height: D,
+            transition: `left ${moveDur} cubic-bezier(0.4,0,0.2,1), top ${moveDur} cubic-bezier(0.4,0,0.2,1)`,
             willChange: "left, top",
             zIndex: 20,
             pointerEvents: "none",
           }}>
-            {/* Bob animation wrapper */}
-            <div style={{ animation: "bobFloat 3.2s ease-in-out infinite", display: "inline-block" }}>
-              <GhostSphere isSpeaking={isSpeaking} blink={blink} />
+            {/* Bob wrapper */}
+            <div style={{ animation: "bob 2.8s ease-in-out infinite" }}>
+              <Sphere isSpeaking={isSpeaking} blink={blink}/>
             </div>
 
-            {/* Projected image */}
-            {projImage && (
+            {/* Pre-loaded image shown during speech */}
+            {projVisible && projImage && (
               <div style={{
                 position: "absolute",
-                left: SPHERE_R * 2 + 20,
-                top: -SPHERE_R * 0.6,
-                width: 200,
-                animation: "imgIn 0.5s ease forwards",
+                left: D + 14,
+                top: -10,
+                width: 180,
+                animation: "imgPop 0.4s ease forwards",
                 zIndex: 10,
               }}>
-                <div style={{
-                  borderRadius: 16,
-                  overflow: "hidden",
-                  border: "1.5px solid rgba(100,160,255,0.3)",
-                  boxShadow: "0 0 30px rgba(60,120,255,0.4)",
-                  background: "#05091a",
-                }}>
-                  {!projLoaded && (
-                    <div className="flex items-center justify-center h-24">
-                      <div className="h-5 w-5 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" />
-                    </div>
-                  )}
-                  <img src={projImage} alt="" style={{ width: "100%", maxHeight: 130, objectFit: "cover", display: projLoaded ? "block" : "none" }}
-                    onLoad={() => setProjLoaded(true)} onError={() => setProjLoaded(true)} />
-                </div>
+                <img
+                  src={projImage}
+                  alt=""
+                  style={{
+                    width: "100%",
+                    borderRadius: 12,
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    display: "block",
+                    background: "#111",
+                  }}
+                />
               </div>
             )}
           </div>
         )}
 
         {/* Exit */}
-        <button onClick={end} className="absolute bottom-5 right-5 z-50 h-9 w-9 rounded-full flex items-center justify-center active:scale-90 transition-all"
-          style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.09)" }}>
-          <svg className="h-4 w-4 text-white/35" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        <button onClick={end}
+          style={{ position: "absolute", bottom: 16, right: 16, zIndex: 50, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "50%", width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <svg width="14" height="14" fill="none" stroke="rgba(255,255,255,0.35)" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
           </svg>
         </button>
 
         {/* Timer */}
-        <div className="absolute bottom-5 left-5 z-50 font-mono text-[10px] tabular-nums select-none"
-          style={{ color: timeLeft < 300 ? "rgba(239,68,68,0.45)" : "rgba(255,255,255,0.15)" }}>
+        <div style={{ position: "absolute", bottom: 18, left: 16, zIndex: 50, fontFamily: "monospace", fontSize: 10, color: timeLeft < 300 ? "rgba(239,68,68,0.5)" : "rgba(255,255,255,0.18)", userSelect: "none" }}>
           {fmt(Math.max(0, timeLeft))}
         </div>
       </div>
